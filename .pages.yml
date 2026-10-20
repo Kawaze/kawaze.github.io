@@ -1,0 +1,141 @@
+# Réglages du panneau admin (Pages CMS : https://app.pagescms.org)
+# Chaque bloc ci-dessous devient un menu dans le panneau.
+
+media: images
+
+content:
+  - name: planning
+    label: Planning
+    type: file
+    path: contenu/planning.json
+    format: json
+    list: true
+    fields:
+      - name: jour
+        label: Jour
+        type: select
+        required: true
+        options:
+          values:
+            - { name: lundi, label: Lundi }
+            - { name: mardi, label: Mardi }
+            - { name: mercredi, label: Mercredi }
+            - { name: jeudi, label: Jeudi }
+            - { name: vendredi, label: Vendredi }
+            - { name: samedi, label: Samedi }
+            - { name: dimanche, label: Dimanche }
+      - name: heure
+        label: Heure (ex. 20:30)
+        type: string
+        required: true
+      - name: titre
+        label: Jeu ou thème du live
+        type: string
+        required: true
+
+  - name: news
+    label: Actus
+    type: file
+    path: contenu/news.json
+    format: json
+    list: true
+    fields:
+      - name: date
+        label: Date
+        type: date
+        options:
+          format: yyyy-MM-dd
+      - name: titre
+        label: Titre
+        type: string
+        required: true
+      - name: texte
+        label: Texte
+        type: text
+      - name: lien
+        label: Lien (facultatif)
+        type: string
+
+  - name: liens
+    label: Clips & liens
+    type: file
+    path: contenu/liens.json
+    format: json
+    list: true
+    fields:
+      - name: titre
+        label: Titre
+        type: string
+        required: true
+      - name: lien
+        label: Adresse du clip ou de la vidéo
+        type: string
+        required: true
+      - name: type
+        label: Type
+        type: select
+        options:
+          values: [Clip, Vidéo, Short, Autre]
+      - name: image
+        label: Miniature (facultatif, automatique pour YouTube)
+        type: image
+
+  - name: jeux
+    label: Jeux
+    type: file
+    path: contenu/jeux.json
+    format: json
+    fields:
+      - name: vedette
+        label: Jeu en vedette
+        type: object
+        fields:
+          - name: nom
+            label: Nom
+            type: string
+          - name: description
+            label: Description
+            type: text
+          - name: lien
+            label: Adresse du jeu
+            type: string
+          - name: image
+            label: Image (facultatif)
+            type: image
+      - name: prochains
+        label: Prochains jeux
+        type: object
+        list: true
+        fields:
+          - name: nom
+            label: Nom
+            type: string
+          - name: etat
+            label: État
+            type: select
+            options:
+              values: [Idée, En développement, Bientôt, Disponible]
+          - name: description
+            label: Description
+            type: text
+
+  - name: reglages
+    label: Réglages
+    type: file
+    path: contenu/reglages.json
+    format: json
+    fields:
+      - name: chaineTwitch
+        label: Nom de la chaîne Twitch (après twitch.tv/)
+        type: string
+      - name: reseaux
+        label: Réseaux
+        type: object
+        list: true
+        fields:
+          - name: nom
+            label: Nom
+            type: string
+          - name: lien
+            label: Adresse
+            type: string
