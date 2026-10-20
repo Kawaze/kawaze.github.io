@@ -1,5 +1,12 @@
 [
-  { "date": "2026-10-20", "titre": "Le site est en ligne", "texte": "Planning, live et Centimes Drop au même endroit.", "lien": "" },
-  { "date": "2026-10-12", "titre": "Nouveau record sur Centimes Drop", "texte": "La barre est placée haut. Qui fait mieux ?", "lien": "" },
-  { "date": "2026-10-01", "titre": "Nouveau planning", "texte": "Un stream de plus le samedi après-midi.", "lien": "" }
+  {
+    "date": "2026-10-20",
+    "titre": "Le site est en ligne",
+    "texte": "ON EST EN LIGNE !"
+  },
+  {
+    "date": "2026-10-18",
+    "titre": "Nouveau planning",
+    "texte": "BRRRRRRRRRRRRR NOUVEAU PLANING LA TEAM"
+  }
 ]
