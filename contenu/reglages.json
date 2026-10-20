@@ -1,9 +1,21 @@
 {
   "chaineTwitch": "kawaze",
   "reseaux": [
-    { "nom": "Twitch", "lien": "https://www.twitch.tv/kawaze" },
-    { "nom": "YouTube", "lien": "https://www.youtube.com/@kawaze" },
-    { "nom": "TikTok", "lien": "https://www.tiktok.com/@kawaze" },
-    { "nom": "Discord", "lien": "https://discord.gg/ton-invitation" }
+    {
+      "nom": "Twitch",
+      "lien": "https://www.twitch.tv/kawaze"
+    },
+    {
+      "nom": "YouTube",
+      "lien": "https://www.youtube.com/@kawaze"
+    },
+    {
+      "nom": "TikTok",
+      "lien": "https://www.tiktok.com/@kawaze67"
+    },
+    {
+      "nom": "Discord",
+      "lien": "https://discord.gg/ton-invitation"
+    }
   ]
 }
