@@ -1,7 +1,27 @@
 [
-  { "jour": "mardi", "heure": "20:30", "titre": "Centimes Drop : record à battre" },
-  { "jour": "mercredi", "heure": "18:00", "titre": "Discussion & jeux de la commu" },
-  { "jour": "vendredi", "heure": "21:00", "titre": "Soirée horreur" },
-  { "jour": "samedi", "heure": "15:00", "titre": "Minecraft" },
-  { "jour": "samedi", "heure": "21:00", "titre": "Jeux avec les viewers" }
+  {
+    "jour": "lundi",
+    "heure": "20:30",
+    "titre": "Random"
+  },
+  {
+    "jour": "mercredi",
+    "heure": "20:30",
+    "titre": "Baldur's Gate 3"
+  },
+  {
+    "jour": "jeudi",
+    "heure": "20:30",
+    "titre": "Team du Jeudi"
+  },
+  {
+    "jour": "samedi",
+    "heure": "12:30",
+    "titre": "Offiline"
+  },
+  {
+    "jour": "dimanche",
+    "heure": "20:30",
+    "titre": "The Complex (FMV)"
+  }
 ]
