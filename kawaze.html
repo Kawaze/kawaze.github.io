@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kawaze — stream &amp; jeux</title>
+  <meta name="description" content="Le live, le planning, les news et les jeux de Kawaze.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="page-kawaze">
+
+  <div class="conteneur">
+    <header class="entete">
+      <a class="marque" href="index.html">Kawaze</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#jeux">Jeux</a>
+        <a href="#planning">Planning</a>
+        <a href="#news">News</a>
+        <a class="vers-mads" href="mads.html">Côté MADS</a>
+      </nav>
+    </header>
+
+    <section class="live" aria-label="Live">
+      <div class="live-grille">
+        <div class="lecteur" id="lecteur"></div>
+        <aside class="prochain">
+          <h1>Prochain live</h1>
+          <p class="prochain-quand" id="prochain-quand">—</p>
+          <p class="prochain-quoi" id="prochain-quoi"></p>
+          <a class="bouton bouton-twitch" id="lien-twitch" href="#" target="_blank" rel="noopener">Suivre sur Twitch</a>
+          <ul class="reseaux" id="reseaux"></ul>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <section class="section jeux" id="jeux">
+    <div class="conteneur">
+      <h2>Les jeux</h2>
+      <p class="section-intro">Fais une partie, puis viens comparer ton score en live.</p>
+
+      <article class="jeu-vedette">
+        <div class="jeu-visuel" id="jeu-visuel"></div>
+        <div>
+          <h3 id="jeu-nom"></h3>
+          <p id="jeu-description"></p>
+          <a class="bouton bouton-jouer" id="jeu-lien" href="#">Jouer</a>
+        </div>
+      </article>
+
+      <div class="a-venir" id="a-venir"></div>
+    </div>
+  </section>
+
+  <div class="conteneur">
+    <section class="section" id="planning">
+      <h2>Planning de la semaine</h2>
+      <p class="section-intro">Heures de Paris.</p>
+      <div class="semaine" id="semaine"></div>
+      <p class="planning-maj" id="planning-maj"></p>
+    </section>
+
+    <section class="section" id="news">
+      <h2>News</h2>
+      <ul class="liste-news" id="liste-news"></ul>
+    </section>
+
+    <footer class="pied">
+      <a href="index.html">Accueil</a> · <a href="mads.html">MADS</a>
+    </footer>
+  </div>
+
+  <script src="contenu-kawaze.js"></script>
+  <script src="kawaze.js"></script>
+</body>
+</html>
