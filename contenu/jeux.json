@@ -2,11 +2,13 @@
   "vedette": {
     "nom": "Centimes Drop",
     "description": "Attrape un maximum de centimes avant qu'ils touchent le sol. Une partie dure une minute, le record se bat en live.",
-    "lien": "https://kawaze.github.io/centimes-drop/",
-    "image": ""
+    "lien": "https://kawaze.github.io/centimes-drop/"
   },
   "prochains": [
-    { "nom": "Projet secret n°2", "etat": "En développement", "description": "Révélé en live quand il sera jouable." },
-    { "nom": "À toi de voter", "etat": "Idée", "description": "Les idées de la commu sur Discord décident du suivant." }
+    {
+      "nom": "Projet secret n°2",
+      "etat": "En développement",
+      "description": "Révélé en live quand il sera jouable."
+    }
   ]
 }
