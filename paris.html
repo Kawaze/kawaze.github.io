@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paris Worlds — Kawaze</title>
+  <meta name="description" content="Parie tes centimes sur les matchs des Worlds avec la commu de Kawaze.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="page-kawaze page-paris">
+
+  <div class="conteneur">
+    <header class="entete">
+      <a class="marque" href="kawaze.html">Kawaze</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="kawaze.html">Live</a>
+        <a href="#matchs">Matchs</a>
+        <a href="#resultats">Résultats</a>
+        <a href="#classement">Classement</a>
+        <a class="vers-mads" href="mads.html">Côté MADS</a>
+      </nav>
+    </header>
+
+    <section class="paris-haut">
+      <div class="paris-titre">
+        <h1>Paris Worlds</h1>
+        <p>Mise tes centimes sur les matchs. Les gagnants se partagent les centimes des perdants et la cagnotte offerte du match.</p>
+        <details class="regles">
+          <summary>Comment ça marche</summary>
+          <ul>
+            <li>Connecte-toi avec ton compte Twitch : tu reçois 1 000 centimes pour commencer.</li>
+            <li>Un pari par match, jusqu'au début du match. Mise minimum : 10 centimes.</li>
+            <li>Chaque match a une cagnotte offerte (500 centimes en général), ajoutée aux centimes des perdants.</li>
+            <li>Si ton équipe gagne, tu récupères ta mise plus ta part du tout, selon ce que tu as misé. La cagnotte offerte peut au plus doubler ta mise.</li>
+            <li>Plus de centimes ? Récupère 100 centimes gratuits chaque jour.</li>
+            <li>Les centimes ne s'achètent pas et ne valent pas d'argent : c'est juste pour le fun et le classement.</li>
+          </ul>
+        </details>
+      </div>
+
+      <aside class="carte-joueur" id="carte-joueur" aria-live="polite">
+        <p class="repos">Chargement…</p>
+      </aside>
+    </section>
+  </div>
+
+  <div class="annonce" id="annonce" role="status" aria-live="polite" hidden></div>
+
+  <div class="conteneur">
+    <section class="section" id="admin" hidden>
+      <h2>Espace admin</h2>
+      <p class="section-intro">Ajoute les matchs du jour, puis indique le vainqueur à la fin : les gains sont versés tout de suite.</p>
+      <form class="form-match" id="form-match">
+        <input type="hidden" id="fm-id">
+        <label>Équipe 1<input id="fm-a" list="equipes" required autocomplete="off"></label>
+        <label>Équipe 2<input id="fm-b" list="equipes" required autocomplete="off"></label>
+        <label>Début du match<input id="fm-debut" type="datetime-local" required></label>
+        <label>Phase (facultatif)<input id="fm-phase" placeholder="Phase suisse, BO3…" autocomplete="off"></label>
+        <label>Cagnotte offerte<input id="fm-bonus" type="number" min="0" step="1" value="500" inputmode="numeric"></label>
+        <div class="form-actions">
+          <button class="bouton bouton-jouer" type="submit" id="fm-envoyer">Ajouter le match</button>
+          <button class="bouton bouton-discret" type="button" id="fm-annuler" hidden>Annuler la modification</button>
+        </div>
+        <datalist id="equipes"></datalist>
+      </form>
+      <div class="admin-liste" id="admin-liste"></div>
+    </section>
+
+    <section class="section" id="matchs">
+      <h2>Matchs à venir</h2>
+      <p class="section-intro">Les paris ferment au début de chaque match.</p>
+      <div id="liste-matchs"><p class="repos">Chargement…</p></div>
+    </section>
+
+    <section class="section" id="resultats">
+      <h2>Résultats</h2>
+      <div id="liste-resultats"><p class="repos">Chargement…</p></div>
+    </section>
+
+    <section class="section" id="classement">
+      <h2>Classement</h2>
+      <p class="section-intro">Les 20 plus gros portefeuilles de la commu.</p>
+      <ol class="classement" id="liste-classement"></ol>
+    </section>
+
+    <footer class="pied">
+      <a href="index.html">Accueil</a> · <a href="kawaze.html">Kawaze</a> · <a href="mads.html">MADS</a>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
+  <script src="paris-config.js"></script>
+  <script src="paris.js"></script>
+</body>
+</html>
