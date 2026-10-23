@@ -34,7 +34,8 @@
     couponOuvert: false, // feuille du coupon sur mobile
     onglet: "matchs",
     confirmation: null,
-    cashout: null,       // match dont le cash out attend une confirmation
+    cashout: null,
+    synchro: null,       // réglages et état de la synchro lolesports (admins)       // match dont le cash out attend une confirmation
     occupe: false,
   };
 
@@ -70,6 +71,10 @@
 
   // ---------- Règles de jeu (identiques à la base) ----------
   const nomEquipe = (m, choix) => (choix === "a" ? m.equipe_a : m.equipe_b);
+  function logoEquipe(m, choix) {
+    const u = imageSure(choix === "a" ? m.logo_a : m.logo_b);
+    return u ? `<img class="bk-logo-equipe" src="${echap(u)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  }
   const fermeture = (m) => new Date(m.debut).getTime() + (m.delai_minutes ?? 5) * 60000;
   function phaseMatch(m) {
     const t = Date.now();
@@ -162,6 +167,12 @@
     etat.mesParis = r.data || [];
   }
 
+  async function chargerSynchro() {
+    if (!(etat.profil && etat.profil.admin)) { etat.synchro = null; return; }
+    const r = await sb.from("synchro").select("*").eq("id", 1).maybeSingle();
+    etat.synchro = r.error ? { absente: true } : (r.data || { absente: true });
+  }
+
   async function chargerClassement() {
     const r = await sb.from("profils").select("id, pseudo, avatar, solde").order("solde", { ascending: false }).limit(20);
     if (r.error) throw r.error;
@@ -182,7 +193,7 @@
   async function toutRecharger() {
     try {
       await chargerProfil();
-      await Promise.all([chargerMatchs(), chargerClassement(), chargerMesParis()]);
+      await Promise.all([chargerMatchs(), chargerClassement(), chargerMesParis(), chargerSynchro()]);
     } catch (e) {
       annoncer(messageErreur(e), "erreur");
     }
@@ -243,7 +254,7 @@
       if (mien && mien.choix === choix) classes.push("bk-cote-mienne");
       return `<button class="${classes.join(" ")}" ${ouvert ? `data-action="choisir" data-match="${m.id}" data-choix="${choix}"` : "disabled"}
           aria-pressed="${sel === choix}">
-          <span class="bk-cote-nom">${echap(nomEquipe(m, choix))}</span>
+          <span class="bk-cote-nom">${logoEquipe(m, choix)}${echap(nomEquipe(m, choix))}</span>
           <span class="bk-cote-val">${ouvert || mien ? coteTexte(cote(m, choix)) : "—"}</span>
         </button>`;
     };
@@ -413,7 +424,7 @@
     el.innerHTML = `<ul class="bk-liste">${etat.resultats.map((m) => {
       const c = cagnottes(m.id);
       const annule = m.statut === "annule";
-      const nom = (choix) => `<span class="${m.gagnant === choix ? "bk-vainqueur" : ""}">${echap(nomEquipe(m, choix))}</span>`;
+      const nom = (choix) => `<span class="${m.gagnant === choix ? "bk-vainqueur" : ""}">${logoEquipe(m, choix)}${echap(nomEquipe(m, choix))}</span>`;
       return `<li class="bk-ligne">
         <div><p class="bk-ligne-titre">${nom("a")} <span class="bk-vs">vs</span> ${nom("b")}</p>
           <p class="bk-ligne-sous">${libelleJour(m.debut)} · ${annule ? "Match annulé, mises remboursées" : nombre(c.total) + " misés · " + c.n + (c.n > 1 ? " paris" : " pari")}</p></div>
@@ -439,8 +450,41 @@
   }
 
   // ---------- Admin ----------
+  function depuis(iso) {
+    if (!iso) return "jamais";
+    const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (min < 1) return "à l'instant";
+    if (min < 60) return `il y a ${min} min`;
+    return `le ${new Date(iso).toLocaleDateString("fr-FR")} à ${heure(iso)}`;
+  }
+
+  function afficherSynchro() {
+    const el = $("synchro");
+    const sy = etat.synchro;
+    if (!sy) { el.innerHTML = ""; return; }
+    if (sy.absente) {
+      el.innerHTML = `<div class="bk-synchro"><h2>Synchro lolesports</h2>
+        <p class="bk-discret">Pas encore installée : passe le fichier synchro-lolesports.sql dans Supabase.</p></div>`;
+      return;
+    }
+    const enPanne = sy.derniere_synchro && Date.now() - new Date(sy.derniere_synchro).getTime() > 10 * 60000;
+    el.innerHTML = `
+      <div class="bk-synchro">
+        <div class="bk-synchro-tete">
+          <h2>Synchro lolesports</h2>
+          <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="lancer-synchro">Synchroniser maintenant</button>
+        </div>
+        <p class="bk-synchro-etat${enPanne ? " bk-urgent" : ""}">Dernière synchro ${depuis(sy.derniere_synchro)}${sy.dernier_message ? " · " + echap(sy.dernier_message) : ""}</p>
+        <label class="bk-interrupteur"><input type="checkbox" data-synchro="import" ${sy.import_auto ? "checked" : ""}>
+          <span>Importer les matchs des Worlds automatiquement</span></label>
+        <label class="bk-interrupteur"><input type="checkbox" data-synchro="reglement" ${sy.reglement_auto ? "checked" : ""}>
+          <span>Régler les matchs terminés automatiquement</span></label>
+      </div>`;
+  }
+
   function afficherAdmin() {
     if (!(etat.profil && etat.profil.admin)) return;
+    afficherSynchro();
     const equipes = new Set();
     [...etat.ouverts, ...etat.resultats].forEach((m) => { equipes.add(m.equipe_a); equipes.add(m.equipe_b); });
     $("equipes").innerHTML = [...equipes].sort().map((e) => `<option value="${echap(e)}">`).join("");
@@ -466,7 +510,7 @@
           <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="demander-annuler" data-match="${m.id}">Annuler et rembourser</button>`;
       }
       return `<div class="bk-admin-match">
-        <p><strong>${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</strong>
+        <p><strong>${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</strong>${m.api_id ? `<span class="bk-tag">lolesports</span>` : ""}
           <span class="bk-discret">${libelleJour(m.debut)} à ${heure(m.debut)} · fermeture +${m.delai_minutes ?? 5} min · ${c.n} ${c.n > 1 ? "paris" : "pari"} · ${nombre(c.total)} misés · ${nombre(cagnotteOfferte(m))} offerts</span></p>
         <div class="bk-admin-actions">${actions}</div>
       </div>`;
@@ -615,6 +659,12 @@
         executer(() => appel("encaisser_pari", { p_match: id }), `Cash out fait : ${nombre(rendu)} centimes récupérés.`);
         break;
       }
+      case "lancer-synchro":
+        executer(async () => {
+          const msg = await appel("lancer_synchro");
+          annoncer(msg || "Synchro lancée.", "info");
+        });
+        break;
       case "renoncer":
         etat.confirmation = null;
         afficherAdmin();
@@ -647,6 +697,19 @@
         $("fm-a").focus();
         break;
     }
+  });
+
+  document.addEventListener("change", (ev) => {
+    const inter = ev.target.closest("[data-synchro]");
+    if (!inter) return;
+    const valeur = inter.checked;
+    const args = inter.dataset.synchro === "import"
+      ? { p_import: valeur, p_reglement: null }
+      : { p_import: null, p_reglement: valeur };
+    executer(() => appel("regler_synchro", args),
+      inter.dataset.synchro === "import"
+        ? (valeur ? "Import automatique activé." : "Import automatique coupé.")
+        : (valeur ? "Règlement automatique activé." : "Règlement automatique coupé : valide les résultats à la main."));
   });
 
   document.addEventListener("input", (ev) => {

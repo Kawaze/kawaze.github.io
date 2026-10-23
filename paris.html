@@ -14,7 +14,7 @@
   <meta property="og:description" content="Mise tes centimes sur les matchs des Worlds, grimpe au classement.">
   <meta property="og:image" content="https://kawaze.github.io/images/partage-paris.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="page-paris">
 
@@ -68,7 +68,8 @@
 
       <section class="bk-vue" data-vue="admin" hidden>
         <h1 class="bk-titre">Admin</h1>
-        <p class="bk-sous-titre">Ajoute les matchs, puis indique le vainqueur à la fin : les gains sont versés tout de suite.</p>
+        <p class="bk-sous-titre">Les matchs des Worlds arrivent tout seuls depuis lolesports. Tu peux aussi en ajouter à la main et régler un match toi-même.</p>
+        <div id="synchro"></div>
         <form class="bk-form-match" id="form-match">
           <input type="hidden" id="fm-id">
           <label>Équipe 1<input id="fm-a" list="equipes" required autocomplete="off"></label>
@@ -107,7 +108,7 @@
   <div class="annonce" id="annonce" role="status" aria-live="polite" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
-  <script src="paris-config.js?v=5"></script>
-  <script src="paris.js?v=5"></script>
+  <script src="paris-config.js?v=6"></script>
+  <script src="paris.js?v=6"></script>
 </body>
 </html>

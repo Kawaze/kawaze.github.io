@@ -463,7 +463,9 @@ a { color: inherit; }
 }
 .bk-cote:not(:disabled):hover { border-color: var(--lilas); background: #20252F; }
 .bk-cote:disabled { cursor: default; }
-.bk-cote-nom { font-weight: 700; overflow-wrap: anywhere; }
+.bk-cote-nom { font-weight: 700; overflow-wrap: anywhere; display: flex; align-items: center; gap: 8px; }
+.bk-logo-equipe { width: 24px; height: 24px; object-fit: contain; flex: none; }
+.bk-ligne-titre .bk-logo-equipe { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; display: inline-block; }
 .bk-cote-val { font-weight: 700; color: var(--or); font-variant-numeric: tabular-nums; font-size: 1.05rem; }
 .bk-cote-choisie { background: var(--or); border-color: var(--or); color: var(--nuit); }
 .bk-cote-choisie .bk-cote-val { color: var(--nuit); }
@@ -553,6 +555,13 @@ a { color: inherit; }
 .bk-admin-match p { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .bk-admin-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .bk-confirmer { font-weight: 700; color: var(--or); margin-right: 4px; }
+.bk-synchro { background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; display: grid; gap: 10px; }
+.bk-synchro-tete { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bk-synchro h2 { margin: 0; font-size: 1.1rem; }
+.bk-synchro-etat { margin: 0; color: var(--lilas); font-size: .9rem; }
+.bk-interrupteur { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; }
+.bk-interrupteur input { width: 18px; height: 18px; accent-color: var(--or); }
+.bk-tag { font-size: .75rem; font-weight: 700; color: var(--lilas); border: 1px solid var(--bk-ligne); border-radius: 5px; padding: .05em .45em; }
 
 /* Pied et messages */
 .bk-pied { max-width: 1240px; margin: 0 auto; padding: 0 16px 48px; color: var(--lilas); }
