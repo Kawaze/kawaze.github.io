@@ -8,6 +8,8 @@
   const nombre = (n) => Number(n || 0).toLocaleString("fr-FR");
   const imageSure = (u) => /^https:\/\//i.test(String(u || "")) ? String(u) : "";
   const MISE_MIN = 10;
+  const CASHOUT_MINUTES = 10;   // identique à la base
+  const CASHOUT_POURCENT = 75;
 
   const config = window.PARIS_CONFIG || {};
   if (!config.url || !config.cle || !window.supabase) {
@@ -32,6 +34,7 @@
     couponOuvert: false, // feuille du coupon sur mobile
     onglet: "matchs",
     confirmation: null,
+    cashout: null,       // match dont le cash out attend une confirmation
     occupe: false,
   };
 
@@ -78,7 +81,7 @@
   function cagnottes(matchId) {
     let a = 0, b = 0, n = 0;
     for (const p of etat.paris) {
-      if (p.match_id !== matchId) continue;
+      if (p.match_id !== matchId || p.encaisse) continue;
       if (p.choix === "a") a += p.mise; else b += p.mise;
       n++;
     }
@@ -94,8 +97,26 @@
     if (camp <= 0) return mise;
     return mise + Math.floor((mise * autre) / camp) + Math.min(mise, Math.floor((mise * (bonus || 0)) / camp));
   }
+  // Cagnotte offerte + les 25 % laissés par les cash out
+  const cagnotteOfferte = (m) => (m.bonus || 0) + (m.bonus_encaisse || 0);
   // Cote indicative : ce que rapporte 100 centimes misés maintenant
-  const cote = (m, choix) => gain(cagnottes(m.id), choix, 100, false, m.bonus) / 100;
+  const cote = (m, choix) => gain(cagnottes(m.id), choix, 100, false, cagnotteOfferte(m)) / 100;
+  // Cash out : jusqu'à 10 minutes après le début, 75 % de la mise
+  const cashoutPossible = (m, pari) => !!pari && !pari.encaisse && m.statut === "ouvert" &&
+    Date.now() < new Date(m.debut).getTime() + CASHOUT_MINUTES * 60000;
+  const montantCashout = (pari) => Math.floor((pari.mise * CASHOUT_POURCENT) / 100);
+  function blocCashout(m, pari) {
+    if (!cashoutPossible(m, pari)) return "";
+    const rendu = nombre(montantCashout(pari));
+    if (etat.cashout === m.id) {
+      return `<span class="bk-cashout-confirmer">Récupérer ${rendu} sur ${nombre(pari.mise)} misés ?
+        <button class="bk-btn bk-btn-plein bk-btn-petit" data-action="cashout-confirmer" data-match="${m.id}">Oui, cash out</button>
+        <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="cashout-renoncer">Non</button></span>`;
+    }
+    const reste = Math.max(1, Math.ceil((new Date(m.debut).getTime() + CASHOUT_MINUTES * 60000 - Date.now()) / 60000));
+    const delai = Date.now() >= new Date(m.debut).getTime() ? ` · encore ${reste} min` : "";
+    return `<button class="bk-btn bk-btn-cashout bk-btn-petit" data-action="cashout-demander" data-match="${m.id}">Cash out ${rendu}${delai}</button>`;
+  }
   const coteTexte = (x) => x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const bonusDispo = () => {
@@ -117,7 +138,7 @@
 
     const ids = [...etat.ouverts, ...etat.resultats].map((m) => m.id);
     if (ids.length) {
-      const r = await sb.from("paris").select("match_id, joueur, choix, mise, gain").in("match_id", ids);
+      const r = await sb.from("paris").select("match_id, joueur, choix, mise, gain, encaisse").in("match_id", ids);
       if (r.error) throw r.error;
       etat.paris = r.data || [];
     } else {
@@ -133,7 +154,7 @@
   async function chargerMesParis() {
     if (!etat.session) { etat.mesParis = []; return; }
     const r = await sb.from("paris")
-      .select("match_id, choix, mise, gain, cree_le, matchs(id, equipe_a, equipe_b, debut, statut, gagnant, bonus, delai_minutes)")
+      .select("match_id, choix, mise, gain, encaisse, cree_le, matchs(id, equipe_a, equipe_b, debut, statut, gagnant, bonus, bonus_encaisse, delai_minutes)")
       .eq("joueur", etat.session.user.id)
       .order("cree_le", { ascending: false })
       .limit(50);
@@ -237,15 +258,18 @@
       infos.push(`<span class="bk-urgent">Ferme dans ${min} min</span>`);
     }
     if (phase === "live-ferme") infos.push(`<span>Paris fermés · résultat bientôt</span>`);
-    if (mien) infos.push(`<span class="bk-mon-pari">Ton pari : ${nombre(mien.mise)} sur ${echap(nomEquipe(m, mien.choix))} · gain estimé ${nombre(gain(c, mien.choix, mien.mise, true, m.bonus))}</span>`);
+    if (mien && mien.encaisse) infos.push(`<span class="bk-mon-pari">Cash out fait : ${nombre(mien.gain)} récupérés sur ${nombre(mien.mise)}</span>`);
+    else if (mien) infos.push(`<span class="bk-mon-pari">Ton pari : ${nombre(mien.mise)} sur ${echap(nomEquipe(m, mien.choix))} · gain estimé ${nombre(gain(c, mien.choix, mien.mise, true, cagnotteOfferte(m)))}</span>`);
     infos.push(`<span>${nombre(c.total)} misés · ${c.n} ${c.n > 1 ? "paris" : "pari"}</span>`);
-    if (m.bonus) infos.push(`<span class="bk-offert">+${nombre(m.bonus)} offerts</span>`);
+    if (cagnotteOfferte(m)) infos.push(`<span class="bk-offert">+${nombre(cagnotteOfferte(m))} offerts</span>`);
+    const cashout = blocCashout(m, mien);
 
     return `
       <article class="bk-match${phase !== "avant" ? " bk-match-live" : ""}">
         <div class="bk-match-quand">${quand}${m.phase ? `<span class="bk-phase">${echap(m.phase)}</span>` : ""}</div>
         <div class="bk-match-cotes">${bouton("a")}${bouton("b")}</div>
         <div class="bk-match-infos">${infos.join("")}</div>
+        ${cashout ? `<div class="bk-match-cashout">${cashout}</div>` : ""}
       </article>`;
   }
 
@@ -271,7 +295,7 @@
     const solde = etat.profil ? etat.profil.solde : 0;
     if (!m) return { gain: 0, ok: false, solde };
     const ok = cp.mise >= MISE_MIN && cp.mise <= solde;
-    return { gain: ok ? gain(cagnottes(m.id), cp.choix, cp.mise, false, m.bonus) : 0, ok, solde };
+    return { gain: ok ? gain(cagnottes(m.id), cp.choix, cp.mise, false, cagnotteOfferte(m)) : 0, ok, solde };
   }
 
   function aideMise(mise, solde) {
@@ -360,19 +384,23 @@
     el.innerHTML = `<ul class="bk-liste">${etat.mesParis.map((p) => {
       const m = p.matchs || {};
       let statut;
+      let cashout = "";
       if (m.statut === "annule") statut = `<span class="bk-statut">Remboursé</span>`;
+      else if (p.encaisse) statut = `<span class="bk-statut bk-statut-encaisse">Cash out · ${nombre(p.gain)} récupérés</span>`;
       else if (m.statut === "termine") {
         statut = (p.gain || 0) > 0
           ? `<span class="bk-statut bk-statut-gagne">Gagné +${nombre((p.gain || 0) - p.mise)}</span>`
           : `<span class="bk-statut bk-statut-perdu">Perdu −${nombre(p.mise)}</span>`;
       } else {
         const enCours = etat.ouverts.find((x) => x.id === p.match_id);
-        const estime = enCours ? gain(cagnottes(p.match_id), p.choix, p.mise, true, enCours.bonus) : null;
+        const estime = enCours ? gain(cagnottes(p.match_id), p.choix, p.mise, true, cagnotteOfferte(enCours)) : null;
         statut = `<span class="bk-statut bk-statut-cours">En cours${estime ? " · gain estimé " + nombre(estime) : ""}</span>`;
+        if (enCours) cashout = blocCashout(enCours, p);
       }
       return `<li class="bk-ligne">
         <div><p class="bk-ligne-titre">${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</p>
-          <p class="bk-ligne-sous">${m.debut ? libelleJour(m.debut) + " " + heure(m.debut) + " · " : ""}${nombre(p.mise)} sur ${echap(nomEquipe(m, p.choix))}</p></div>
+          <p class="bk-ligne-sous">${m.debut ? libelleJour(m.debut) + " " + heure(m.debut) + " · " : ""}${nombre(p.mise)} sur ${echap(nomEquipe(m, p.choix))}</p>
+          ${cashout ? `<div class="bk-ligne-cashout">${cashout}</div>` : ""}</div>
         ${statut}
       </li>`;
     }).join("")}</ul>` + sortie;
@@ -439,7 +467,7 @@
       }
       return `<div class="bk-admin-match">
         <p><strong>${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</strong>
-          <span class="bk-discret">${libelleJour(m.debut)} à ${heure(m.debut)} · fermeture +${m.delai_minutes ?? 5} min · ${c.n} ${c.n > 1 ? "paris" : "pari"} · ${nombre(c.total)} misés · ${nombre(m.bonus || 0)} offerts</span></p>
+          <span class="bk-discret">${libelleJour(m.debut)} à ${heure(m.debut)} · fermeture +${m.delai_minutes ?? 5} min · ${c.n} ${c.n > 1 ? "paris" : "pari"} · ${nombre(c.total)} misés · ${nombre(cagnotteOfferte(m))} offerts</span></p>
         <div class="bk-admin-actions">${actions}</div>
       </div>`;
     }).join("");
@@ -570,6 +598,23 @@
         etat.confirmation = { type: "annuler", match: id };
         afficherAdmin();
         break;
+      case "cashout-demander":
+        etat.cashout = id;
+        afficherMatchs();
+        afficherMesParis();
+        break;
+      case "cashout-renoncer":
+        etat.cashout = null;
+        afficherMatchs();
+        afficherMesParis();
+        break;
+      case "cashout-confirmer": {
+        etat.cashout = null;
+        const pari = monPari(id);
+        const rendu = pari ? montantCashout(pari) : 0;
+        executer(() => appel("encaisser_pari", { p_match: id }), `Cash out fait : ${nombre(rendu)} centimes récupérés.`);
+        break;
+      }
       case "renoncer":
         etat.confirmation = null;
         afficherAdmin();

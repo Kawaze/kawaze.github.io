@@ -473,6 +473,12 @@ a { color: inherit; }
 .bk-offert { color: var(--or); font-weight: 700; }
 .bk-urgent { color: var(--rose); font-weight: 700; }
 .bk-mon-pari { color: var(--papier); font-weight: 500; }
+.bk-match-cashout { grid-column: 2; }
+.bk-ligne-cashout { margin-top: 8px; }
+.bk-btn-cashout { background: transparent; border: 1px solid var(--bk-vert); color: var(--bk-vert) !important; }
+.bk-btn-cashout:hover { background: rgba(52,194,122,.1); }
+.bk-cashout-confirmer { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; font-size: .9rem; }
+.bk-statut-encaisse { color: var(--papier); }
 
 /* Coupon */
 .bk-coupon {
@@ -598,6 +604,7 @@ a { color: inherit; }
   .bk-match { grid-template-columns: 1fr; }
   .bk-match-quand { grid-auto-flow: column; justify-content: start; gap: 10px; align-items: baseline; }
   .bk-match-infos { grid-column: 1; }
+  .bk-match-cashout { grid-column: 1; }
   .bk-ligne { flex-direction: column; align-items: flex-start; }
   .bk-statut-cours { text-align: left; }
 }
