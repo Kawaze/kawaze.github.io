@@ -1,5 +1,5 @@
-// Page Paris : connexion Twitch, paris en centimes, classement et espace admin.
-// Les règles (solde, heure limite, admins) sont vérifiées dans la base Supabase.
+// Page Paris : connexion Twitch, cotes, coupon de pari, classement et espace admin.
+// Les règles (solde, heure de fermeture, admins) sont vérifiées dans la base Supabase.
 
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -7,13 +7,11 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   const nombre = (n) => Number(n || 0).toLocaleString("fr-FR");
   const imageSure = (u) => /^https:\/\//i.test(String(u || "")) ? String(u) : "";
+  const MISE_MIN = 10;
 
   const config = window.PARIS_CONFIG || {};
   if (!config.url || !config.cle || !window.supabase) {
-    const msg = `<p class="repos">Les paris ne sont pas encore ouverts. Reviens bientôt !</p>`;
-    $("carte-joueur").innerHTML = msg;
-    $("liste-matchs").innerHTML = msg;
-    $("liste-resultats").innerHTML = "";
+    $("liste-matchs").innerHTML = `<p class="bk-vide">Les paris ne sont pas encore ouverts. Reviens bientôt !</p>`;
     return;
   }
 
@@ -28,9 +26,12 @@
     ouverts: [],
     resultats: [],
     paris: [],
+    mesParis: [],
     classement: [],
-    selection: {},      // { [matchId]: { choix, mise } }
-    confirmation: null, // action admin en attente de confirmation
+    coupon: null,        // { match, choix, mise }
+    couponOuvert: false, // feuille du coupon sur mobile
+    onglet: "matchs",
+    confirmation: null,
     occupe: false,
   };
 
@@ -64,7 +65,16 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
 
-  // ---------- Calculs ----------
+  // ---------- Règles de jeu (identiques à la base) ----------
+  const nomEquipe = (m, choix) => (choix === "a" ? m.equipe_a : m.equipe_b);
+  const fermeture = (m) => new Date(m.debut).getTime() + (m.delai_minutes ?? 5) * 60000;
+  function phaseMatch(m) {
+    const t = Date.now();
+    if (t < new Date(m.debut).getTime()) return "avant";
+    return t < fermeture(m) ? "live-ouvert" : "live-ferme";
+  }
+  const parisOuverts = (m) => m.statut === "ouvert" && phaseMatch(m) !== "live-ferme";
+
   function cagnottes(matchId) {
     let a = 0, b = 0, n = 0;
     for (const p of etat.paris) {
@@ -76,22 +86,18 @@
   }
   const monPari = (matchId) =>
     etat.session ? etat.paris.find((p) => p.match_id === matchId && p.joueur === etat.session.user.id) : null;
-  // Même calcul que la base : mise + part des perdants + part de la cagnotte offerte
-  // (la part de cagnotte offerte peut au plus doubler la mise).
-  function gainEstime(c, choix, mise, dejaCompte, bonus) {
+
+  // Mise + part des perdants + part de la cagnotte offerte (au plus le double de la mise)
+  function gain(c, choix, mise, dejaCompte, bonus) {
     const camp = (choix === "a" ? c.a : c.b) + (dejaCompte ? 0 : mise);
     const autre = choix === "a" ? c.b : c.a;
     if (camp <= 0) return mise;
     return mise + Math.floor((mise * autre) / camp) + Math.min(mise, Math.floor((mise * (bonus || 0)) / camp));
   }
-  const nomEquipe = (m, choix) => (choix === "a" ? m.equipe_a : m.equipe_b);
-  function texteGain(m, choix, mise) {
-    if (!(mise >= 10)) return "Mise minimum : 10 centimes";
-    const c = cagnottes(m.id);
-    if ((choix === "a" ? c.b : c.a) === 0 && !m.bonus) return "Personne n'a encore misé en face : pour l'instant, tu récupérerais juste ta mise.";
-    return `Si ${nomEquipe(m, choix)} gagne : ${nombre(gainEstime(c, choix, mise, false, m.bonus))} centimes`;
-  }
-  const commence = (m) => new Date(m.debut).getTime() <= Date.now();
+  // Cote indicative : ce que rapporte 100 centimes misés maintenant
+  const cote = (m, choix) => gain(cagnottes(m.id), choix, 100, false, m.bonus) / 100;
+  const coteTexte = (x) => x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const bonusDispo = () => {
     if (!etat.profil) return false;
     const aujourdhui = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
@@ -102,7 +108,7 @@
   async function chargerMatchs() {
     const [ouverts, finis] = await Promise.all([
       sb.from("matchs").select("*").eq("statut", "ouvert").order("debut", { ascending: true }),
-      sb.from("matchs").select("*").neq("statut", "ouvert").order("debut", { ascending: false }).limit(20),
+      sb.from("matchs").select("*").neq("statut", "ouvert").order("debut", { ascending: false }).limit(30),
     ]);
     if (ouverts.error) throw ouverts.error;
     if (finis.error) throw finis.error;
@@ -117,6 +123,22 @@
     } else {
       etat.paris = [];
     }
+    // Le coupon ne garde pas un match fermé ou déjà parié
+    if (etat.coupon) {
+      const m = etat.ouverts.find((x) => x.id === etat.coupon.match);
+      if (!m || !parisOuverts(m) || monPari(m.id)) etat.coupon = null;
+    }
+  }
+
+  async function chargerMesParis() {
+    if (!etat.session) { etat.mesParis = []; return; }
+    const r = await sb.from("paris")
+      .select("match_id, choix, mise, gain, cree_le, matchs(id, equipe_a, equipe_b, debut, statut, gagnant, bonus, delai_minutes)")
+      .eq("joueur", etat.session.user.id)
+      .order("cree_le", { ascending: false })
+      .limit(50);
+    if (r.error) throw r.error;
+    etat.mesParis = r.data || [];
   }
 
   async function chargerClassement() {
@@ -139,42 +161,43 @@
   async function toutRecharger() {
     try {
       await chargerProfil();
-      await Promise.all([chargerMatchs(), chargerClassement()]);
+      await Promise.all([chargerMatchs(), chargerClassement(), chargerMesParis()]);
     } catch (e) {
       annoncer(messageErreur(e), "erreur");
     }
     afficherTout();
   }
 
-  // ---------- Affichage : carte joueur ----------
-  function afficherJoueur() {
-    const el = $("carte-joueur");
+  // ---------- Barre du haut : compte ----------
+  function afficherCompte() {
+    const el = $("compte");
     if (!etat.session) {
-      el.innerHTML = `
-        <p class="carte-joueur-titre">Prêt à parier ?</p>
-        <p class="carte-joueur-texte">Connecte-toi avec Twitch et reçois 1 000 centimes pour commencer.</p>
-        <button class="bouton bouton-twitch-connexion" data-action="connexion">Se connecter avec Twitch</button>`;
+      el.innerHTML = `<button class="bk-btn bk-btn-twitch" data-action="connexion">Se connecter avec Twitch</button>`;
       return;
     }
     const p = etat.profil;
-    if (!p) { el.innerHTML = `<p class="repos">Chargement de ton profil…</p>`; return; }
+    if (!p) { el.innerHTML = `<span class="bk-discret">Chargement…</span>`; return; }
     const avatar = imageSure(p.avatar);
     el.innerHTML = `
-      <div class="joueur-identite">
-        ${avatar ? `<img class="avatar" src="${echap(avatar)}" alt="">` : `<span class="avatar avatar-vide" aria-hidden="true">${echap(p.pseudo.charAt(0))}</span>`}
-        <div>
-          <p class="joueur-pseudo">${echap(p.pseudo)}</p>
-          ${etat.rang ? `<p class="joueur-rang">${etat.rang === 1 ? "1er" : etat.rang + "e"} du classement</p>` : ""}
-        </div>
-      </div>
-      <p class="solde"><span class="piece" aria-hidden="true"></span><strong>${nombre(p.solde)}</strong> centimes</p>
-      ${bonusDispo()
-        ? `<button class="bouton bouton-jouer" data-action="bonus">Récupérer mes 100 centimes du jour</button>`
-        : `<p class="joueur-bonus-pris">Bonus du jour récupéré. Prochain demain.</p>`}
-      <button class="lien-discret" data-action="deconnexion">Se déconnecter</button>`;
+      ${bonusDispo() ? `<button class="bk-btn bk-btn-bonus" data-action="bonus">+100<span class="bk-masque-mobile"> du jour</span></button>` : ""}
+      <span class="bk-solde" title="Ton solde"><span class="piece" aria-hidden="true"></span>${nombre(p.solde)}</span>
+      <span class="bk-profil">
+        ${avatar ? `<img class="avatar avatar-petit" src="${echap(avatar)}" alt="">` : `<span class="avatar avatar-petit avatar-vide" aria-hidden="true">${echap(p.pseudo.charAt(0))}</span>`}
+        <span class="bk-profil-texte"><strong>${echap(p.pseudo)}</strong>${etat.rang ? `<span>${etat.rang === 1 ? "1er" : etat.rang + "e"} au classement</span>` : ""}</span>
+      </span>
+      <button class="bk-lien bk-masque-mobile" data-action="deconnexion">Déconnexion</button>`;
   }
 
-  // ---------- Affichage : matchs à venir ----------
+  // ---------- Onglets ----------
+  function afficherOnglets() {
+    const estAdmin = !!(etat.profil && etat.profil.admin);
+    $("onglet-admin").hidden = !estAdmin;
+    if (etat.onglet === "admin" && !estAdmin && etat.profil) etat.onglet = "matchs";
+    document.querySelectorAll("[data-onglet]").forEach((b) => b.setAttribute("aria-selected", b.dataset.onglet === etat.onglet ? "true" : "false"));
+    document.querySelectorAll("[data-vue]").forEach((v) => { v.hidden = v.dataset.vue !== etat.onglet; });
+  }
+
+  // ---------- Matchs ----------
   function grouperParJour(liste) {
     const groupes = [];
     for (const m of liste) {
@@ -186,113 +209,195 @@
     return groupes;
   }
 
-  function barre(c, m) {
-    const pa = c.total ? Math.round((c.a / c.total) * 100) : 50;
-    return `
-      <div class="cagnotte" aria-label="Répartition des mises">
-        <div class="cagnotte-barre"><span style="width:${pa}%"></span></div>
-        <div class="cagnotte-legende">
-          ${c.total
-            ? `<span>${nombre(c.a)} (${pa} %)</span><span>${c.n} ${c.n > 1 ? "paris" : "pari"}</span><span>${nombre(c.b)} (${100 - pa} %)</span>`
-            : `<span>Aucune mise pour l'instant</span>`}
-        </div>
-      </div>`;
-  }
-
-  function carteMatch(m) {
+  function ligneMatch(m) {
     const c = cagnottes(m.id);
     const mien = monPari(m.id);
-    const ferme = commence(m);
-    const sel = etat.selection[m.id];
-    const equipe = (choix) => {
-      const nom = nomEquipe(m, choix);
-      const classes = ["equipe"];
-      if (mien && mien.choix === choix) classes.push("equipe-mienne");
-      if (!mien && sel && sel.choix === choix) classes.push("equipe-choisie");
-      const actif = !ferme && !mien && etat.session;
-      return `<button class="${classes.join(" ")}" ${actif ? `data-action="choisir" data-match="${m.id}" data-choix="${choix}"` : "disabled"}
-        aria-pressed="${sel && sel.choix === choix ? "true" : "false"}">${echap(nom)}</button>`;
+    const phase = phaseMatch(m);
+    const ouvert = parisOuverts(m) && !mien;
+    const sel = etat.coupon && etat.coupon.match === m.id ? etat.coupon.choix : null;
+
+    const bouton = (choix) => {
+      const classes = ["bk-cote"];
+      if (sel === choix) classes.push("bk-cote-choisie");
+      if (mien && mien.choix === choix) classes.push("bk-cote-mienne");
+      return `<button class="${classes.join(" ")}" ${ouvert ? `data-action="choisir" data-match="${m.id}" data-choix="${choix}"` : "disabled"}
+          aria-pressed="${sel === choix}">
+          <span class="bk-cote-nom">${echap(nomEquipe(m, choix))}</span>
+          <span class="bk-cote-val">${ouvert || mien ? coteTexte(cote(m, choix)) : "—"}</span>
+        </button>`;
     };
 
-    let bas = "";
-    if (mien) {
-      bas = `<p class="mon-pari">Ton pari : <strong>${nombre(mien.mise)}</strong> sur ${echap(nomEquipe(m, mien.choix))}.
-        Gain estimé : <strong>${nombre(gainEstime(c, mien.choix, mien.mise, true, m.bonus))}</strong></p>`;
-    } else if (ferme) {
-      bas = `<p class="repos">Match commencé, paris fermés. Résultat bientôt.</p>`;
-    } else if (!etat.session) {
-      bas = `<p class="repos">Connecte-toi avec Twitch pour parier.</p>`;
-    } else if (sel) {
-      const solde = etat.profil ? etat.profil.solde : 0;
-      const mise = Math.max(0, Math.min(sel.mise || 0, solde));
-      bas = `
-        <div class="form-pari">
-          <label class="mise">Mise
-            <input type="number" inputmode="numeric" min="10" max="${solde}" step="1" value="${mise || ""}"
-              data-champ="mise" data-match="${m.id}">
-          </label>
-          <div class="raccourcis">
-            <button data-action="ajouter" data-match="${m.id}" data-valeur="100">+100</button>
-            <button data-action="ajouter" data-match="${m.id}" data-valeur="500">+500</button>
-            <button data-action="ajouter" data-match="${m.id}" data-valeur="tout">Tout</button>
-          </div>
-          <p class="gain-estime" data-gain="${m.id}">${echap(texteGain(m, sel.choix, mise))}</p>
-          <button class="bouton bouton-jouer" data-action="parier" data-match="${m.id}">Parier sur ${echap(nomEquipe(m, sel.choix))}</button>
-        </div>`;
-    } else {
-      bas = `<p class="repos">Choisis une équipe pour parier.</p>`;
+    const quand = phase === "avant"
+      ? `<span class="bk-heure">${heure(m.debut)}</span>`
+      : `<span class="bk-live">Live</span>`;
+
+    const infos = [];
+    if (phase === "live-ouvert" && !mien) {
+      const min = Math.max(1, Math.ceil((fermeture(m) - Date.now()) / 60000));
+      infos.push(`<span class="bk-urgent">Ferme dans ${min} min</span>`);
     }
+    if (phase === "live-ferme") infos.push(`<span>Paris fermés · résultat bientôt</span>`);
+    if (mien) infos.push(`<span class="bk-mon-pari">Ton pari : ${nombre(mien.mise)} sur ${echap(nomEquipe(m, mien.choix))} · gain estimé ${nombre(gain(c, mien.choix, mien.mise, true, m.bonus))}</span>`);
+    infos.push(`<span>${nombre(c.total)} misés · ${c.n} ${c.n > 1 ? "paris" : "pari"}</span>`);
+    if (m.bonus) infos.push(`<span class="bk-offert">+${nombre(m.bonus)} offerts</span>`);
 
     return `
-      <article class="match${ferme ? " match-ferme" : ""}">
-        <p class="match-info"><strong>${heure(m.debut)}</strong>${m.phase ? ` <span>${echap(m.phase)}</span>` : ""}${m.bonus ? ` <span class="offert">+${nombre(m.bonus)} offerts</span>` : ""}</p>
-        <div class="match-equipes">${equipe("a")}<span class="vs">vs</span>${equipe("b")}</div>
-        ${barre(c, m)}
-        ${bas}
+      <article class="bk-match${phase !== "avant" ? " bk-match-live" : ""}">
+        <div class="bk-match-quand">${quand}${m.phase ? `<span class="bk-phase">${echap(m.phase)}</span>` : ""}</div>
+        <div class="bk-match-cotes">${bouton("a")}${bouton("b")}</div>
+        <div class="bk-match-infos">${infos.join("")}</div>
       </article>`;
   }
 
   function afficherMatchs() {
     const el = $("liste-matchs");
     if (!etat.ouverts.length) {
-      el.innerHTML = `<p class="repos">Pas de match ouvert pour l'instant. Les prochains arrivent bientôt.</p>`;
+      el.innerHTML = `<p class="bk-vide">Pas de match ouvert pour l'instant. Les prochains arrivent bientôt.</p>`;
       return;
     }
-    el.innerHTML = grouperParJour(etat.ouverts).map((g) => `
-      <div class="jour-matchs">
-        <h3 class="jour-titre">${g.libelle}</h3>
-        <div class="grille-matchs">${g.matchs.map(carteMatch).join("")}</div>
-      </div>`).join("");
+    const live = etat.ouverts.filter((m) => phaseMatch(m) !== "avant");
+    const avenir = etat.ouverts.filter((m) => phaseMatch(m) === "avant");
+    let html = "";
+    if (live.length) html += `<div class="bk-groupe"><h2 class="bk-groupe-titre bk-groupe-live">En direct</h2>${live.map(ligneMatch).join("")}</div>`;
+    html += grouperParJour(avenir).map((g) =>
+      `<div class="bk-groupe"><h2 class="bk-groupe-titre">${g.libelle}</h2>${g.matchs.map(ligneMatch).join("")}</div>`).join("");
+    el.innerHTML = html;
   }
 
-  // ---------- Affichage : résultats ----------
+  // ---------- Coupon ----------
+  function calculCoupon() {
+    const cp = etat.coupon;
+    const m = cp && etat.ouverts.find((x) => x.id === cp.match);
+    const solde = etat.profil ? etat.profil.solde : 0;
+    if (!m) return { gain: 0, ok: false, solde };
+    const ok = cp.mise >= MISE_MIN && cp.mise <= solde;
+    return { gain: ok ? gain(cagnottes(m.id), cp.choix, cp.mise, false, m.bonus) : 0, ok, solde };
+  }
+
+  function aideMise(mise, solde) {
+    if (!(mise >= MISE_MIN)) return `Mise minimum : ${MISE_MIN} centimes.`;
+    if (mise > solde) return `Solde insuffisant : tu as ${nombre(solde)} centimes.`;
+    return `Il te restera ${nombre(solde - mise)} centimes. Le gain final dépend des mises à la fermeture.`;
+  }
+
+  function afficherCoupon() {
+    const el = $("coupon");
+    const cp = etat.coupon;
+    const m = cp && etat.ouverts.find((x) => x.id === cp.match);
+    el.classList.toggle("bk-coupon-actif", !!m);
+    el.classList.toggle("bk-coupon-ouvert", !!m && etat.couponOuvert);
+
+    if (!m) {
+      el.innerHTML = `
+        <div class="bk-coupon-tete"><h2>Coupon</h2></div>
+        <p class="bk-coupon-vide">Clique sur une cote pour préparer ton pari.</p>`;
+      return;
+    }
+
+    const { gain: g, ok, solde } = calculCoupon();
+    let corps;
+    if (!etat.session) {
+      corps = `<button class="bk-btn bk-btn-twitch bk-btn-large" data-action="connexion">Se connecter avec Twitch pour parier</button>`;
+    } else {
+      corps = `
+        <label class="bk-mise">Mise
+          <input type="number" inputmode="numeric" min="${MISE_MIN}" max="${solde}" step="1" value="${cp.mise || ""}" id="coupon-mise">
+        </label>
+        <div class="bk-raccourcis">
+          <button data-action="ajouter" data-valeur="100">+100</button>
+          <button data-action="ajouter" data-valeur="500">+500</button>
+          <button data-action="ajouter" data-valeur="tout">Tout</button>
+        </div>
+        <dl class="bk-recap">
+          <div><dt>Cote pour ta mise</dt><dd id="coupon-cote">${ok ? coteTexte(g / cp.mise) : coteTexte(cote(m, cp.choix))}</dd></div>
+          <div class="bk-recap-gain"><dt>Gain potentiel</dt><dd id="coupon-gain">${ok ? nombre(g) : "—"}</dd></div>
+        </dl>
+        <p class="bk-coupon-aide" id="coupon-aide">${aideMise(cp.mise, solde)}</p>
+        <button class="bk-btn bk-btn-plein bk-btn-large" data-action="parier" id="coupon-valider" ${ok ? "" : "disabled"}>Valider le pari</button>`;
+    }
+
+    el.innerHTML = `
+      <div class="bk-coupon-tete">
+        <h2>Coupon <span class="bk-pastille">1</span></h2>
+        <button class="bk-lien bk-coupon-replier" data-action="replier">Replier</button>
+      </div>
+      <button class="bk-coupon-barre" data-action="deplier">
+        <span>${echap(nomEquipe(m, cp.choix))} · cote ${coteTexte(cote(m, cp.choix))}</span>
+        <strong>Voir le coupon</strong>
+      </button>
+      <div class="bk-coupon-corps">
+        <div class="bk-selection">
+          <div>
+            <p class="bk-selection-match">${echap(m.equipe_a)} vs ${echap(m.equipe_b)} · ${libelleJour(m.debut)} ${heure(m.debut)}</p>
+            <p class="bk-selection-choix">${echap(nomEquipe(m, cp.choix))}</p>
+          </div>
+          <button class="bk-retirer" data-action="retirer" aria-label="Retirer ce pari du coupon">×</button>
+        </div>
+        ${corps}
+      </div>`;
+  }
+
+  function majCouponSansRedessiner() {
+    if (!etat.coupon) return;
+    const { gain: g, ok, solde } = calculCoupon();
+    const elGain = $("coupon-gain"), aide = $("coupon-aide"), btn = $("coupon-valider"), elCote = $("coupon-cote");
+    if (elGain) elGain.textContent = ok ? nombre(g) : "—";
+    if (elCote && ok) elCote.textContent = coteTexte(g / etat.coupon.mise);
+    if (aide) aide.textContent = aideMise(etat.coupon.mise, solde);
+    if (btn) btn.disabled = !ok;
+  }
+
+  // ---------- Mes paris ----------
+  function afficherMesParis() {
+    const el = $("liste-mes-paris");
+    if (!etat.session) {
+      el.innerHTML = `<p class="bk-vide">Connecte-toi avec Twitch pour voir tes paris.</p>
+        <button class="bk-btn bk-btn-twitch" data-action="connexion">Se connecter avec Twitch</button>`;
+      return;
+    }
+    const sortie = `<p class="bk-sortie">Connecté en tant que ${echap(etat.profil ? etat.profil.pseudo : "")} · <button class="bk-lien" data-action="deconnexion">Se déconnecter</button></p>`;
+    if (!etat.mesParis.length) { el.innerHTML = `<p class="bk-vide">Tu n'as pas encore parié. Choisis une cote dans l'onglet Matchs.</p>` + sortie; return; }
+    el.innerHTML = `<ul class="bk-liste">${etat.mesParis.map((p) => {
+      const m = p.matchs || {};
+      let statut;
+      if (m.statut === "annule") statut = `<span class="bk-statut">Remboursé</span>`;
+      else if (m.statut === "termine") {
+        statut = (p.gain || 0) > 0
+          ? `<span class="bk-statut bk-statut-gagne">Gagné +${nombre((p.gain || 0) - p.mise)}</span>`
+          : `<span class="bk-statut bk-statut-perdu">Perdu −${nombre(p.mise)}</span>`;
+      } else {
+        const enCours = etat.ouverts.find((x) => x.id === p.match_id);
+        const estime = enCours ? gain(cagnottes(p.match_id), p.choix, p.mise, true, enCours.bonus) : null;
+        statut = `<span class="bk-statut bk-statut-cours">En cours${estime ? " · gain estimé " + nombre(estime) : ""}</span>`;
+      }
+      return `<li class="bk-ligne">
+        <div><p class="bk-ligne-titre">${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</p>
+          <p class="bk-ligne-sous">${m.debut ? libelleJour(m.debut) + " " + heure(m.debut) + " · " : ""}${nombre(p.mise)} sur ${echap(nomEquipe(m, p.choix))}</p></div>
+        ${statut}
+      </li>`;
+    }).join("")}</ul>` + sortie;
+  }
+
+  // ---------- Résultats ----------
   function afficherResultats() {
     const el = $("liste-resultats");
-    if (!etat.resultats.length) { el.innerHTML = `<p class="repos">Aucun résultat pour l'instant.</p>`; return; }
-    el.innerHTML = `<ul class="resultats">${etat.resultats.map((m) => {
+    if (!etat.resultats.length) { el.innerHTML = `<p class="bk-vide">Aucun résultat pour l'instant.</p>`; return; }
+    el.innerHTML = `<ul class="bk-liste">${etat.resultats.map((m) => {
       const c = cagnottes(m.id);
-      const mien = monPari(m.id);
       const annule = m.statut === "annule";
-      const nom = (choix) => `<span class="${m.gagnant === choix ? "vainqueur" : ""}">${echap(nomEquipe(m, choix))}</span>`;
-      let perso = "";
-      if (mien) {
-        const net = (mien.gain || 0) - mien.mise;
-        perso = annule ? `<span class="bilan">Remboursé</span>`
-          : `<span class="bilan ${net >= 0 ? "bilan-plus" : "bilan-moins"}">${net >= 0 ? "+" : "−"}${nombre(Math.abs(net))}</span>`;
-      }
-      return `<li class="resultat">
-        <span class="resultat-date">${libelleJour(m.debut)}</span>
-        <span class="resultat-match">${nom("a")} <span class="vs">vs</span> ${nom("b")}</span>
-        <span class="resultat-detail">${annule ? "Annulé" : nombre(c.total) + " centimes en jeu"}</span>
-        ${perso}
+      const nom = (choix) => `<span class="${m.gagnant === choix ? "bk-vainqueur" : ""}">${echap(nomEquipe(m, choix))}</span>`;
+      return `<li class="bk-ligne">
+        <div><p class="bk-ligne-titre">${nom("a")} <span class="bk-vs">vs</span> ${nom("b")}</p>
+          <p class="bk-ligne-sous">${libelleJour(m.debut)} · ${annule ? "Match annulé, mises remboursées" : nombre(c.total) + " misés · " + c.n + (c.n > 1 ? " paris" : " pari")}</p></div>
+        ${annule ? `<span class="bk-statut">Annulé</span>` : `<span class="bk-statut bk-statut-gagne">${echap(nomEquipe(m, m.gagnant))}</span>`}
       </li>`;
     }).join("")}</ul>`;
   }
 
-  // ---------- Affichage : classement ----------
+  // ---------- Classement ----------
   function afficherClassement() {
     const el = $("liste-classement");
-    if (!etat.classement.length) { el.innerHTML = `<li class="repos">Personne n'a encore parié. À toi de jouer !</li>`; return; }
+    if (!etat.classement.length) { el.innerHTML = `<li class="bk-vide">Personne n'a encore parié. À toi de jouer !</li>`; return; }
     const moi = etat.session ? etat.session.user.id : null;
     el.innerHTML = etat.classement.map((p, i) => {
       const avatar = imageSure(p.avatar);
@@ -305,18 +410,15 @@
     }).join("");
   }
 
-  // ---------- Affichage : admin ----------
+  // ---------- Admin ----------
   function afficherAdmin() {
-    const estAdmin = !!(etat.profil && etat.profil.admin);
-    $("admin").hidden = !estAdmin;
-    if (!estAdmin) return;
-
+    if (!(etat.profil && etat.profil.admin)) return;
     const equipes = new Set();
     [...etat.ouverts, ...etat.resultats].forEach((m) => { equipes.add(m.equipe_a); equipes.add(m.equipe_b); });
     $("equipes").innerHTML = [...equipes].sort().map((e) => `<option value="${echap(e)}">`).join("");
 
     const el = $("admin-liste");
-    if (!etat.ouverts.length) { el.innerHTML = `<p class="repos">Aucun match en attente de résultat.</p>`; return; }
+    if (!etat.ouverts.length) { el.innerHTML = `<p class="bk-vide">Aucun match en attente de résultat.</p>`; return; }
     el.innerHTML = etat.ouverts.map((m) => {
       const c = cagnottes(m.id);
       const conf = etat.confirmation && etat.confirmation.match === m.id ? etat.confirmation : null;
@@ -325,30 +427,33 @@
         const texte = conf.type === "annuler"
           ? "Annuler ce match et rembourser tout le monde ?"
           : `Confirmer la victoire de ${echap(nomEquipe(m, conf.choix))} ?`;
-        actions = `<span class="confirmer-texte">${texte}</span>
-          <button class="bouton bouton-jouer bouton-petit" data-action="confirmer">Oui, confirmer</button>
-          <button class="bouton bouton-discret bouton-petit" data-action="renoncer">Non</button>`;
+        actions = `<span class="bk-confirmer">${texte}</span>
+          <button class="bk-btn bk-btn-plein bk-btn-petit" data-action="confirmer">Oui, confirmer</button>
+          <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="renoncer">Non</button>`;
       } else {
         actions = `
-          <button class="bouton bouton-jouer bouton-petit" data-action="demander-regler" data-match="${m.id}" data-choix="a">${echap(m.equipe_a)} gagne</button>
-          <button class="bouton bouton-jouer bouton-petit" data-action="demander-regler" data-match="${m.id}" data-choix="b">${echap(m.equipe_b)} gagne</button>
-          <button class="bouton bouton-discret bouton-petit" data-action="modifier" data-match="${m.id}">Modifier</button>
-          <button class="bouton bouton-discret bouton-petit" data-action="demander-annuler" data-match="${m.id}">Annuler et rembourser</button>`;
+          <button class="bk-btn bk-btn-plein bk-btn-petit" data-action="demander-regler" data-match="${m.id}" data-choix="a">${echap(m.equipe_a)} gagne</button>
+          <button class="bk-btn bk-btn-plein bk-btn-petit" data-action="demander-regler" data-match="${m.id}" data-choix="b">${echap(m.equipe_b)} gagne</button>
+          <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="modifier" data-match="${m.id}">Modifier</button>
+          <button class="bk-btn bk-btn-ligne bk-btn-petit" data-action="demander-annuler" data-match="${m.id}">Annuler et rembourser</button>`;
       }
-      return `<div class="admin-match">
+      return `<div class="bk-admin-match">
         <p><strong>${echap(m.equipe_a)} vs ${echap(m.equipe_b)}</strong>
-          <span class="admin-meta">${libelleJour(m.debut)} à ${heure(m.debut)} · ${c.n} ${c.n > 1 ? "paris" : "pari"} · ${nombre(c.total)} centimes misés · ${nombre(m.bonus || 0)} offerts</span></p>
-        <div class="admin-actions">${actions}</div>
+          <span class="bk-discret">${libelleJour(m.debut)} à ${heure(m.debut)} · fermeture +${m.delai_minutes ?? 5} min · ${c.n} ${c.n > 1 ? "paris" : "pari"} · ${nombre(c.total)} misés · ${nombre(m.bonus || 0)} offerts</span></p>
+        <div class="bk-admin-actions">${actions}</div>
       </div>`;
     }).join("");
   }
 
   function afficherTout() {
-    afficherJoueur();
-    afficherAdmin();
+    afficherCompte();
+    afficherOnglets();
     afficherMatchs();
+    afficherCoupon();
+    afficherMesParis();
     afficherResultats();
     afficherClassement();
+    afficherAdmin();
   }
 
   // ---------- Actions ----------
@@ -382,7 +487,17 @@
     $("fm-annuler").hidden = true;
   }
 
+  function changerOnglet(nom) {
+    etat.onglet = nom;
+    try { history.replaceState(null, "", nom === "matchs" ? location.pathname : "#" + nom); } catch (e) { /* rien */ }
+    afficherOnglets();
+    window.scrollTo({ top: 0 });
+  }
+
   document.addEventListener("click", (ev) => {
+    const onglet = ev.target.closest("[data-onglet]");
+    if (onglet) { changerOnglet(onglet.dataset.onglet); return; }
+
     const b = ev.target.closest("[data-action]");
     if (!b) return;
     const action = b.dataset.action;
@@ -401,29 +516,50 @@
         executer(() => appel("bonus_du_jour"), "+100 centimes ajoutés !");
         break;
       case "choisir": {
-        const ancien = etat.selection[id];
-        etat.selection[id] = { choix: b.dataset.choix, mise: ancien ? ancien.mise : 100 };
+        const memeChoix = etat.coupon && etat.coupon.match === id && etat.coupon.choix === b.dataset.choix;
+        if (memeChoix) {
+          etat.coupon = null;
+        } else {
+          etat.coupon = { match: id, choix: b.dataset.choix, mise: etat.coupon ? etat.coupon.mise : 100 };
+          etat.couponOuvert = true;
+        }
         afficherMatchs();
-        const champ = document.querySelector(`[data-champ="mise"][data-match="${id}"]`);
-        if (champ) champ.focus();
+        afficherCoupon();
+        const champ = $("coupon-mise");
+        if (champ && window.matchMedia("(min-width: 901px)").matches) champ.focus();
         break;
       }
-      case "ajouter": {
-        const sel = etat.selection[id];
-        if (!sel || !etat.profil) return;
-        sel.mise = b.dataset.valeur === "tout" ? etat.profil.solde : (sel.mise || 0) + Number(b.dataset.valeur);
-        sel.mise = Math.min(sel.mise, etat.profil.solde);
+      case "retirer":
+        etat.coupon = null;
         afficherMatchs();
+        afficherCoupon();
+        break;
+      case "deplier":
+        etat.couponOuvert = true;
+        afficherCoupon();
+        break;
+      case "replier":
+        etat.couponOuvert = false;
+        afficherCoupon();
+        break;
+      case "ajouter": {
+        if (!etat.coupon || !etat.profil) return;
+        const solde = etat.profil.solde;
+        etat.coupon.mise = b.dataset.valeur === "tout" ? solde : Math.min(solde, (etat.coupon.mise || 0) + Number(b.dataset.valeur));
+        const champ = $("coupon-mise");
+        if (champ) champ.value = etat.coupon.mise;
+        majCouponSansRedessiner();
         break;
       }
       case "parier": {
-        const sel = etat.selection[id];
-        if (!sel || !m) return;
-        const mise = Math.floor(sel.mise || 0);
+        const cp = etat.coupon;
+        const mm = cp && etat.ouverts.find((x) => x.id === cp.match);
+        if (!cp || !mm) return;
+        const mise = Math.floor(cp.mise || 0);
         executer(async () => {
-          await appel("placer_pari", { p_match: id, p_choix: sel.choix, p_mise: mise });
-          delete etat.selection[id];
-        }, `Pari enregistré : ${nombre(mise)} centimes sur ${nomEquipe(m, sel.choix)}.`);
+          await appel("placer_pari", { p_match: cp.match, p_choix: cp.choix, p_mise: mise });
+          etat.coupon = null;
+        }, `Pari validé : ${nombre(mise)} centimes sur ${nomEquipe(mm, cp.choix)}.`);
         break;
       }
       case "demander-regler":
@@ -459,6 +595,7 @@
         $("fm-debut").value = versChampDate(m.debut);
         $("fm-phase").value = m.phase || "";
         $("fm-bonus").value = m.bonus ?? 0;
+        $("fm-delai").value = m.delai_minutes ?? 5;
         $("fm-envoyer").textContent = "Enregistrer les modifications";
         $("fm-annuler").hidden = false;
         $("form-match").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -467,19 +604,10 @@
     }
   });
 
-  // Saisie de la mise : on met à jour le gain estimé sans tout redessiner
   document.addEventListener("input", (ev) => {
-    const champ = ev.target.closest('[data-champ="mise"]');
-    if (!champ) return;
-    const id = Number(champ.dataset.match);
-    const sel = etat.selection[id];
-    const m = etat.ouverts.find((x) => x.id === id);
-    if (!sel || !m) return;
-    sel.mise = Math.max(0, Math.floor(Number(champ.value) || 0));
-    const g = document.querySelector(`[data-gain="${id}"]`);
-    if (g) {
-      g.textContent = texteGain(m, sel.choix, sel.mise);
-    }
+    if (ev.target.id !== "coupon-mise" || !etat.coupon) return;
+    etat.coupon.mise = Math.max(0, Math.floor(Number(ev.target.value) || 0));
+    majCouponSansRedessiner();
   });
 
   $("form-match").addEventListener("submit", (ev) => {
@@ -495,6 +623,7 @@
         p_debut: debut.toISOString(),
         p_phase: $("fm-phase").value,
         p_bonus: Math.max(0, Math.floor(Number($("fm-bonus").value) || 0)),
+        p_delai: Math.min(5, Math.max(0, Math.floor(Number($("fm-delai").value) || 0))),
       });
       viderFormulaire();
     }, idExistant ? "Match modifié." : "Match ajouté.");
@@ -502,19 +631,27 @@
   $("fm-annuler").addEventListener("click", viderFormulaire);
 
   // ---------- Démarrage ----------
+  const depuisAdresse = location.hash.replace("#", "");
+  if (["mes-paris", "resultats", "classement", "admin"].includes(depuisAdresse)) etat.onglet = depuisAdresse;
+  afficherOnglets();
+  afficherCoupon();
+
   sb.auth.onAuthStateChange((evenement, session) => {
     const changement = (etat.session && etat.session.user.id) !== (session && session.user.id);
     etat.session = session;
-    if (evenement === "INITIAL_SESSION" || changement) {
-      setTimeout(toutRecharger, 0);
-    }
+    if (evenement === "INITIAL_SESSION" || changement) setTimeout(toutRecharger, 0);
   });
 
-  // Les paris se ferment à l'heure : on rafraîchit régulièrement
+  // Toutes les 30 s : cotes, compte à rebours et fermeture des paris
   setInterval(() => {
     if (document.hidden || etat.occupe) return;
-    if (document.activeElement && document.activeElement.closest(".form-pari, .form-match")) return;
-    chargerMatchs().then(() => { afficherMatchs(); afficherResultats(); afficherAdmin(); }).catch(() => {});
-  }, 60000);
+    chargerMatchs().then(() => {
+      afficherMatchs();
+      afficherResultats();
+      if (document.activeElement && document.activeElement.id === "coupon-mise") majCouponSansRedessiner();
+      else afficherCoupon();
+      if (!(document.activeElement && document.activeElement.closest("#form-match"))) afficherAdmin();
+    }).catch(() => {});
+  }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) toutRecharger(); });
 })();

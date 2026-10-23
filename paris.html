@@ -8,88 +8,102 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="images/icone-paris.png">
+  <link rel="apple-touch-icon" href="images/icone-paris-180.png">
+  <meta property="og:title" content="Kawaze Paris : les paris Worlds de la commu">
+  <meta property="og:description" content="Mise tes centimes sur les matchs des Worlds, grimpe au classement.">
+  <meta property="og:image" content="https://kawaze.github.io/images/partage-paris.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="page-kawaze page-paris">
+<body class="page-paris">
 
-  <div class="conteneur">
-    <header class="entete">
-      <a class="marque" href="kawaze.html">Kawaze</a>
-      <nav class="nav" aria-label="Sections">
-        <a href="kawaze.html">Live</a>
-        <a href="#matchs">Matchs</a>
-        <a href="#resultats">Résultats</a>
-        <a href="#classement">Classement</a>
-        <a class="vers-mads" href="mads.html">Côté MADS</a>
+  <header class="bk-barre">
+    <div class="bk-barre-int">
+      <a class="bk-logo" href="paris.html"><img src="images/logo-kawaze-paris.png" alt="Kawaze Paris" width="234" height="40"></a>
+      <nav class="bk-liens" aria-label="Site">
+        <a href="kawaze.html">Live Twitch</a>
+        <a href="index.html">Accueil</a>
       </nav>
-    </header>
+      <div class="bk-compte" id="compte" aria-live="polite"></div>
+    </div>
+  </header>
 
-    <section class="paris-haut">
-      <div class="paris-titre">
-        <h1>Paris Worlds</h1>
-        <p>Mise tes centimes sur les matchs. Les gagnants se partagent les centimes des perdants et la cagnotte offerte du match.</p>
-        <details class="regles">
-          <summary>Comment ça marche</summary>
-          <ul>
-            <li>Connecte-toi avec ton compte Twitch : tu reçois 1 000 centimes pour commencer.</li>
-            <li>Un pari par match, jusqu'au début du match. Mise minimum : 10 centimes.</li>
-            <li>Chaque match a une cagnotte offerte (500 centimes en général), ajoutée aux centimes des perdants.</li>
-            <li>Si ton équipe gagne, tu récupères ta mise plus ta part du tout, selon ce que tu as misé. La cagnotte offerte peut au plus doubler ta mise.</li>
-            <li>Plus de centimes ? Récupère 100 centimes gratuits chaque jour.</li>
-            <li>Les centimes ne s'achètent pas et ne valent pas d'argent : c'est juste pour le fun et le classement.</li>
-          </ul>
-        </details>
-      </div>
+  <nav class="bk-onglets" aria-label="Paris">
+    <div class="bk-onglets-int" role="tablist">
+      <button role="tab" data-onglet="matchs" aria-selected="true">Matchs</button>
+      <button role="tab" data-onglet="mes-paris" aria-selected="false">Mes paris</button>
+      <button role="tab" data-onglet="resultats" aria-selected="false">Résultats</button>
+      <button role="tab" data-onglet="classement" aria-selected="false">Classement</button>
+      <button role="tab" data-onglet="admin" aria-selected="false" id="onglet-admin" hidden>Admin</button>
+    </div>
+  </nav>
 
-      <aside class="carte-joueur" id="carte-joueur" aria-live="polite">
-        <p class="repos">Chargement…</p>
-      </aside>
-    </section>
+  <div class="bk-page">
+    <main class="bk-principal">
+
+      <section class="bk-vue" data-vue="matchs">
+        <div class="bk-promo">
+          <p class="bk-promo-titre">Worlds 2026</p>
+          <p class="bk-promo-texte">Cagnotte offerte sur chaque match. Paris ouverts jusqu'à 5 minutes après le coup d'envoi.</p>
+        </div>
+        <div id="liste-matchs"><p class="bk-vide">Chargement…</p></div>
+      </section>
+
+      <section class="bk-vue" data-vue="mes-paris" hidden>
+        <h1 class="bk-titre">Mes paris</h1>
+        <div id="liste-mes-paris"></div>
+      </section>
+
+      <section class="bk-vue" data-vue="resultats" hidden>
+        <h1 class="bk-titre">Résultats</h1>
+        <div id="liste-resultats"></div>
+      </section>
+
+      <section class="bk-vue" data-vue="classement" hidden>
+        <h1 class="bk-titre">Classement</h1>
+        <p class="bk-sous-titre">Les 20 plus gros portefeuilles de la commu.</p>
+        <ol class="bk-classement" id="liste-classement"></ol>
+      </section>
+
+      <section class="bk-vue" data-vue="admin" hidden>
+        <h1 class="bk-titre">Admin</h1>
+        <p class="bk-sous-titre">Ajoute les matchs, puis indique le vainqueur à la fin : les gains sont versés tout de suite.</p>
+        <form class="bk-form-match" id="form-match">
+          <input type="hidden" id="fm-id">
+          <label>Équipe 1<input id="fm-a" list="equipes" required autocomplete="off"></label>
+          <label>Équipe 2<input id="fm-b" list="equipes" required autocomplete="off"></label>
+          <label>Début du match<input id="fm-debut" type="datetime-local" required></label>
+          <label>Phase (facultatif)<input id="fm-phase" placeholder="Phase suisse · BO1" autocomplete="off"></label>
+          <label>Cagnotte offerte<input id="fm-bonus" type="number" min="0" step="1" value="500" inputmode="numeric"></label>
+          <label>Paris ouverts après le début (0 à 5 min)<input id="fm-delai" type="number" min="0" max="5" step="1" value="5" inputmode="numeric"></label>
+          <div class="bk-form-actions">
+            <button class="bk-btn bk-btn-plein" type="submit" id="fm-envoyer">Ajouter le match</button>
+            <button class="bk-btn bk-btn-ligne" type="button" id="fm-annuler" hidden>Annuler la modification</button>
+          </div>
+          <datalist id="equipes"></datalist>
+        </form>
+        <div id="admin-liste"></div>
+      </section>
+    </main>
+
+    <aside class="bk-coupon" id="coupon" aria-label="Coupon de pari"></aside>
   </div>
+
+  <footer class="bk-pied">
+    <details>
+      <summary>Comment ça marche</summary>
+      <ul>
+        <li>Connecte-toi avec Twitch : tu reçois 1 000 centimes pour commencer, puis 100 centimes gratuits chaque jour.</li>
+        <li>Un pari par match, jusqu'à 5 minutes après le début du match. Mise minimum : 10 centimes.</li>
+        <li>Si ton équipe gagne, tu récupères ta mise, plus ta part des centimes des perdants et de la cagnotte offerte, selon ce que tu as misé. La cagnotte offerte peut au plus doubler ta mise.</li>
+        <li>Les cotes sont indicatives : elles bougent à chaque nouveau pari. Ton gain final dépend de toutes les mises à la fermeture.</li>
+        <li>Les centimes ne s'achètent pas et ne valent pas d'argent : c'est pour le fun et le classement.</li>
+      </ul>
+    </details>
+  </footer>
 
   <div class="annonce" id="annonce" role="status" aria-live="polite" hidden></div>
-
-  <div class="conteneur">
-    <section class="section" id="admin" hidden>
-      <h2>Espace admin</h2>
-      <p class="section-intro">Ajoute les matchs du jour, puis indique le vainqueur à la fin : les gains sont versés tout de suite.</p>
-      <form class="form-match" id="form-match">
-        <input type="hidden" id="fm-id">
-        <label>Équipe 1<input id="fm-a" list="equipes" required autocomplete="off"></label>
-        <label>Équipe 2<input id="fm-b" list="equipes" required autocomplete="off"></label>
-        <label>Début du match<input id="fm-debut" type="datetime-local" required></label>
-        <label>Phase (facultatif)<input id="fm-phase" placeholder="Phase suisse, BO3…" autocomplete="off"></label>
-        <label>Cagnotte offerte<input id="fm-bonus" type="number" min="0" step="1" value="500" inputmode="numeric"></label>
-        <div class="form-actions">
-          <button class="bouton bouton-jouer" type="submit" id="fm-envoyer">Ajouter le match</button>
-          <button class="bouton bouton-discret" type="button" id="fm-annuler" hidden>Annuler la modification</button>
-        </div>
-        <datalist id="equipes"></datalist>
-      </form>
-      <div class="admin-liste" id="admin-liste"></div>
-    </section>
-
-    <section class="section" id="matchs">
-      <h2>Matchs à venir</h2>
-      <p class="section-intro">Les paris ferment au début de chaque match.</p>
-      <div id="liste-matchs"><p class="repos">Chargement…</p></div>
-    </section>
-
-    <section class="section" id="resultats">
-      <h2>Résultats</h2>
-      <div id="liste-resultats"><p class="repos">Chargement…</p></div>
-    </section>
-
-    <section class="section" id="classement">
-      <h2>Classement</h2>
-      <p class="section-intro">Les 20 plus gros portefeuilles de la commu.</p>
-      <ol class="classement" id="liste-classement"></ol>
-    </section>
-
-    <footer class="pied">
-      <a href="index.html">Accueil</a> · <a href="kawaze.html">Kawaze</a> · <a href="mads.html">MADS</a>
-    </footer>
-  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
   <script src="paris-config.js"></script>
