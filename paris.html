@@ -14,7 +14,7 @@
   <meta property="og:description" content="Mise tes centimes sur les matchs des Worlds, grimpe au classement.">
   <meta property="og:image" content="https://kawaze.github.io/images/partage-paris.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="page-paris">
 
@@ -22,8 +22,7 @@
     <div class="bk-barre-int">
       <a class="bk-logo" href="paris.html"><img src="images/logo-kawaze-paris.png" alt="Kawaze Paris" width="234" height="40"></a>
       <nav class="bk-liens" aria-label="Site">
-        <a href="kawaze.html">Live Twitch</a>
-        <a href="index.html">Accueil</a>
+        <a href="https://www.twitch.tv/kawaze" target="_blank" rel="noopener">Live Twitch</a>
       </nav>
       <div class="bk-compte" id="compte" aria-live="polite"></div>
     </div>
@@ -97,7 +96,8 @@
       <ul>
         <li>Connecte-toi avec Twitch : tu reçois 1 000 centimes pour commencer, puis 100 centimes gratuits chaque jour.</li>
         <li>Un pari par match, jusqu'à 5 minutes après le début du match. Mise minimum : 10 centimes.</li>
-        <li>Si ton équipe gagne, tu récupères ta mise, plus ta part des centimes des perdants et de la cagnotte offerte, selon ce que tu as misé. La cagnotte offerte peut au plus doubler ta mise.</li>
+        <li>Si ton équipe gagne, tu récupères ta mise, plus ta part des centimes des perdants et de la cagnotte offerte, au prorata de ce que tu as misé. La cagnotte offerte peut au plus doubler ta mise.
+          Exemple : 500 centimes misés en face, et de ton côté une personne à 200 et quatre à 100 (600 au total). Celle à 200 a misé un tiers du camp gagnant, elle touche un tiers des 500 ; chaque personne à 100 en touche un sixième.</li>
         <li>Cash out : tant que le match n'a pas plus de 10 minutes, tu peux encaisser ton pari et récupérer 75 % de ta mise. Les 25 % restants rejoignent la cagnotte du match pour les gagnants. Après un cash out, tu ne peux plus reparier sur ce match.</li>
         <li>Les cotes sont indicatives : elles bougent à chaque nouveau pari. Ton gain final dépend de toutes les mises à la fermeture.</li>
         <li>Les centimes ne s'achètent pas et ne valent pas d'argent : c'est pour le fun et le classement.</li>
@@ -108,7 +108,7 @@
   <div class="annonce" id="annonce" role="status" aria-live="polite" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
-  <script src="paris-config.js?v=6"></script>
-  <script src="paris.js?v=6"></script>
+  <script src="paris-config.js?v=7"></script>
+  <script src="paris.js?v=7"></script>
 </body>
 </html>
