@@ -1,0 +1,424 @@
+/* =========================================================
+   KAWAZE GAMES — roulette, crash et course en direct
+   S'appuie sur style.css (polices, en-tête et palette de la page Paris).
+   Mise en page : la roue à gauche, le tapis à droite, tes jetons dessous ;
+   sur téléphone le tapis passe à la verticale comme vu depuis la table.
+   ========================================================= */
+.page-kawazino {
+  --kz-tapis: #0E4F3B;      /* feutre */
+  --kz-tapis-2: #083326;    /* feutre dans l'ombre */
+  --kz-trait: rgba(221, 178, 74, .55);  /* lignes dorées du tapis */
+  --kz-rouge: #C8323A;
+  --kz-noir: #15171C;
+  --kz-zero: #1E9862;
+  --kz-ombre: rgba(0, 0, 0, .45);
+  --kz-voile: rgba(5, 8, 7, .55);
+  --kz-lueur: rgba(221, 178, 74, .55);
+  --kz-gagne: #4FD08F;
+  --kz-perdu: #F07A7E;
+}
+
+.kz-logo { font-size: clamp(1.05rem, 4.6vw, 1.6rem); white-space: nowrap; letter-spacing: .02em; text-shadow: 0 .08em 0 var(--rose); }
+.kz-page {
+  max-width: 1400px; margin: 0 auto;
+  padding-block: 18px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px;
+}
+.kz-surtitre { font-size: .75rem; text-transform: uppercase; letter-spacing: .14em; color: var(--lilas); font-weight: 700; }
+.page-kawazino code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9em; background: var(--bk-panneau-2); padding: .05em .35em; border-radius: 5px; color: var(--or); }
+
+/* ---------- Barre d'état ---------- */
+.kz-statut {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px;
+  padding: 14px 18px;
+}
+.kz-phase { display: grid; gap: 2px; margin-right: auto; min-width: 0; }
+.kz-phase strong { font-family: var(--titre-kawaze); font-weight: 400; font-size: clamp(1.3rem, 2.4vw, 2rem); line-height: 1.15; color: var(--papier); text-wrap: balance; }
+.kz-sous-phase { color: var(--lilas); font-size: .95rem; }
+.kz-sous-phase .gagne { color: var(--kz-gagne); font-weight: 700; }
+.kz-sous-phase .perdu { color: var(--kz-perdu); font-weight: 700; }
+.kz-minuteur {
+  --p: 1; width: 74px; height: 74px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: conic-gradient(var(--or) calc(var(--p) * 360deg), var(--bk-panneau-2) 0);
+}
+.kz-minuteur span {
+  width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bk-panneau); font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums;
+}
+.kz-minuteur.urgent { background: conic-gradient(var(--rose) calc(var(--p) * 360deg), var(--bk-panneau-2) 0); }
+.kz-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-left: 16px; border-left: 1px solid var(--bk-ligne); }
+.kz-admin label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--lilas); cursor: pointer; }
+.kz-admin input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--or); }
+.kz-admin select { background: var(--bk-panneau-2); color: var(--papier); border: 1px solid var(--bk-ligne); border-radius: 8px; padding: .4em .5em; font: inherit; }
+.kz-admin .kz-etiquette { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--or); }
+.bk-btn-danger { background: transparent; border: 1px solid var(--rose); color: var(--rose) !important; }
+
+/* ---------- Casino fermé ---------- */
+.kz-ferme {
+  text-align: center; padding: 48px 20px; border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 0%, var(--kz-tapis), var(--kz-tapis-2) 75%);
+  border: 2px solid var(--kz-trait);
+}
+.kz-ferme-titre { font-family: var(--titre-kawaze); font-size: clamp(1.8rem, 5vw, 3.2rem); color: var(--or); margin: 0 0 8px; text-shadow: 0 .06em 0 var(--rose); }
+.kz-ferme p { margin: 0 auto 10px; max-width: 46ch; }
+.kz-ferme-liens { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px !important; }
+
+/* ---------- La table ---------- */
+.kz-table {
+  display: grid; grid-template-columns: minmax(220px, 330px) minmax(0, 1fr); gap: 22px; align-items: center;
+  padding: clamp(14px, 2vw, 26px); border-radius: 26px;
+  background: radial-gradient(ellipse 85% 75% at 55% 40%, var(--kz-tapis), var(--kz-tapis-2) 85%);
+  box-shadow: inset 0 0 0 3px var(--kz-trait), inset 0 0 70px var(--kz-ombre), 0 12px 40px var(--kz-ombre);
+}
+.kz-cylindre { display: grid; gap: 14px; justify-items: center; min-width: 0; }
+.kz-roue-cadre { position: relative; width: 100%; max-width: 330px; aspect-ratio: 1; }
+#roue { width: 100%; height: 100%; display: block; border-radius: 50%; box-shadow: 0 14px 34px var(--kz-ombre); }
+.kz-bille-repere {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  border-left: 11px solid transparent; border-right: 11px solid transparent; border-top: 20px solid var(--papier);
+  filter: drop-shadow(0 3px 3px var(--kz-ombre));
+}
+.kz-resultat {
+  position: absolute; inset: 32%; border-radius: 50%; border: 3px solid var(--or);
+  display: grid; place-content: center; text-align: center; animation: kz-pop .4s ease-out;
+}
+.kz-resultat b { font-family: var(--titre-kawaze); font-weight: 400; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1; }
+.kz-resultat span { font-size: .7rem; text-transform: uppercase; letter-spacing: .16em; font-weight: 700; }
+.kz-resultat.rouge { background: var(--kz-rouge); }
+.kz-resultat.noir { background: var(--kz-noir); }
+.kz-resultat.zero { background: var(--kz-zero); }
+@keyframes kz-pop { from { transform: scale(.6); opacity: 0; } }
+.kz-historique { display: grid; gap: 6px; justify-items: center; }
+.kz-histo-liste { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.kz-histo {
+  min-width: 30px; height: 30px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  font-weight: 700; font-size: .85rem; font-variant-numeric: tabular-nums; border: 1px solid rgba(255, 255, 255, .15);
+}
+.kz-histo.rouge { background: var(--kz-rouge); }
+.kz-histo.noir { background: var(--kz-noir); }
+.kz-histo.zero { background: var(--kz-zero); }
+.kz-histo:first-child { outline: 2px solid var(--or); outline-offset: 1px; }
+
+/* ---------- Le tapis ----------
+   Toutes les cases, zones de clic et jetons sont placés en pourcentage
+   par kawazino.js : une seule grille de coordonnées pour tout. */
+.kz-tapis-cadre { min-width: 0; display: grid; gap: 8px; }
+.kz-tapis { position: relative; width: 100%; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.kz-tapis.horizontal { aspect-ratio: 14 / 5.29; }
+.kz-tapis.vertical { aspect-ratio: 4.6 / 8.68; max-width: 480px; margin-inline: auto; }
+.kz-case {
+  position: absolute; display: grid; place-items: center;
+  border: 1px solid var(--kz-trait); color: var(--papier);
+  font-weight: 800; font-size: calc(var(--cell, 50px) * .36); font-variant-numeric: tabular-nums;
+  transition: box-shadow .15s, filter .15s;
+}
+.kz-case.num { border-radius: 4px; }
+.kz-case.rouge .kz-num { background: var(--kz-rouge); }
+.kz-case.noir .kz-num { background: var(--kz-noir); }
+.kz-case.zero { background: var(--kz-zero); border-radius: 50% 0 0 50% / 18% 0 0 18%; }
+.kz-tapis.vertical .kz-case.zero { border-radius: 50% 50% 0 0 / 30% 30% 0 0; }
+.kz-num {
+  display: grid; place-items: center; width: 72%; aspect-ratio: 1; max-height: 86%;
+  border-radius: 50%; line-height: 1;
+}
+.kz-tapis.vertical .kz-num { width: auto; height: 82%; }
+.kz-case.ext { font-size: calc(var(--cell, 50px) * .28); font-weight: 700; text-align: center; padding: 2px; line-height: 1.1; }
+.kz-losange { display: inline-block; width: calc(var(--cell, 50px) * .42); height: calc(var(--cell, 50px) * .42); transform: rotate(45deg); }
+.kz-losange.rouge { background: var(--kz-rouge); }
+.kz-losange.noir { background: var(--kz-noir); border: 1px solid var(--lilas); }
+.kz-case.allume { box-shadow: inset 0 0 0 3px var(--or), 0 0 16px var(--kz-lueur); z-index: 1; }
+.kz-case.gagnant { box-shadow: inset 0 0 0 4px var(--papier), 0 0 26px var(--kz-lueur); z-index: 1; animation: kz-clignote .6s steps(2) 4; }
+@keyframes kz-clignote { 50% { filter: brightness(1.5); } }
+
+.kz-cible {
+  position: absolute; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; z-index: 3;
+  border-radius: 50%;
+}
+.kz-cible.zone { border-radius: 4px; z-index: 2; }
+.kz-cible.point { width: calc(var(--cell, 50px) * .46); height: calc(var(--cell, 50px) * .46); transform: translate(-50%, -50%); }
+.kz-tapis.vertical .kz-case.long span { writing-mode: vertical-rl; transform: rotate(180deg); }
+.kz-cible:hover, .kz-cible:focus-visible, .kz-cible.choisie { background: rgba(245, 197, 66, .22); outline: none; }
+.kz-cible.point:hover, .kz-cible.point:focus-visible, .kz-cible.point.choisie { background: rgba(245, 197, 66, .55); box-shadow: 0 0 0 2px var(--or); }
+.kz-tapis.ferme .kz-cible { cursor: default; }
+.kz-tapis.gomme .kz-cible { cursor: not-allowed; }
+
+/* Jetons posés */
+.kz-jeton {
+  position: absolute; z-index: 4; pointer-events: none;
+  width: var(--jeton, 30px); height: var(--jeton, 30px); transform: translate(-50%, -50%);
+  border-radius: 50%; display: grid; place-items: center;
+  font-weight: 800; font-size: calc(var(--jeton, 30px) * .34); line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--kz-jeton-texte, #fff);
+  background: radial-gradient(circle, var(--kz-jeton-coeur, #fff) 0 46%, transparent 47%), repeating-conic-gradient(var(--kz-jeton-bord, #fff) 0 30deg, var(--kz-jeton-coeur, #fff) 0 60deg);
+  box-shadow: 0 3px 6px var(--kz-ombre), inset 0 0 0 2px rgba(0, 0, 0, .25);
+  animation: kz-pose .25s ease-out;
+}
+.kz-jeton.t1 { --kz-jeton-coeur: #F1ECE0; --kz-jeton-bord: #2E6DB4; --kz-jeton-texte: #15171C; }
+.kz-jeton.t2 { --kz-jeton-coeur: #C8323A; --kz-jeton-bord: #F1ECE0; }
+.kz-jeton.t3 { --kz-jeton-coeur: #1E7D4F; --kz-jeton-bord: #F1ECE0; }
+.kz-jeton.t4 { --kz-jeton-coeur: #15171C; --kz-jeton-bord: #DDB24A; }
+.kz-jeton.t5 { --kz-jeton-coeur: #6C2BD9; --kz-jeton-bord: #F1ECE0; }
+.kz-jeton.t6 { --kz-jeton-coeur: #DDB24A; --kz-jeton-bord: #15171C; --kz-jeton-texte: #15171C; }
+.kz-jeton.moi { box-shadow: 0 0 0 3px var(--or), 0 0 14px var(--kz-lueur), 0 3px 6px var(--kz-ombre); }
+.kz-jeton.perdant { opacity: .35; filter: grayscale(.8); transition: opacity .6s .3s; }
+.kz-jeton.gagnant { box-shadow: 0 0 0 3px var(--papier), 0 0 22px var(--kz-lueur); }
+@keyframes kz-pose { from { transform: translate(-50%, -90%) scale(1.3); opacity: 0; } }
+.kz-nom {
+  position: absolute; z-index: 5; pointer-events: none; transform: translate(-50%, 0);
+  margin-top: calc(var(--jeton, 30px) * .52);
+  max-width: calc(var(--cell, 50px) * 1.9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: calc(var(--cell, 50px) * .2); font-weight: 700; line-height: 1.25;
+  padding: 0 4px; border-radius: 4px; background: var(--kz-voile); color: var(--papier);
+}
+.kz-tapis.vertical .kz-nom { display: none; }
+
+.kz-info-pari { margin: 0; min-height: 1.5em; font-size: .95rem; color: var(--papier); text-align: center; }
+.kz-info-pari b { color: var(--or); }
+
+/* ---------- Les jetons du joueur ---------- */
+.kz-rack {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px; padding: 12px 16px;
+}
+.kz-jetons { display: flex; flex-wrap: wrap; gap: 8px; }
+.kz-choix-jeton {
+  --jeton: 50px; position: relative; width: 50px; height: 50px; border: 0; cursor: pointer;
+  animation: none; transform: none; pointer-events: auto; font-size: 15px;
+  transition: transform .15s;
+}
+.page-kawazino .kz-choix-jeton { color: var(--kz-jeton-texte, #fff); font-weight: 800; font-size: 15px; line-height: 1; }
+.kz-choix-jeton:hover { transform: translateY(-3px); }
+.kz-choix-jeton[aria-checked="true"] { transform: translateY(-5px); box-shadow: 0 0 0 3px var(--or), 0 8px 16px var(--kz-ombre); }
+.kz-rack-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.kz-sur-tapis { color: var(--lilas); font-size: .95rem; margin-right: 6px; }
+.kz-sur-tapis b { color: var(--or); font-variant-numeric: tabular-nums; }
+#btn-gomme[aria-pressed="true"] { background: var(--rose); border-color: var(--rose); color: #fff; }
+.kz-confirmer {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bk-panneau-2); border: 1px solid var(--or); border-radius: 10px; padding: 10px 12px;
+}
+.kz-confirmer span { min-width: 0; }
+
+/* ---------- Le bas ---------- */
+.kz-bas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.kz-panneau { background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.kz-panneau-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.kz-panneau h2 { margin: 0; font-family: var(--titre-kawaze); font-weight: 400; font-size: 1.15rem; color: var(--or); }
+.kz-pot { font-weight: 800; color: var(--or); font-variant-numeric: tabular-nums; }
+.kz-liste-mises, .kz-classement { list-style: none; margin: 0; padding: 0; display: grid; }
+.kz-mise-joueur { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--bk-ligne); }
+.kz-mise-joueur:last-child { border-bottom: 0; }
+.kz-mise-joueur.moi .kz-mj-nom { color: var(--or); }
+.kz-mj-nom { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kz-mj-nom small { font-weight: 500; color: var(--lilas); margin-left: 6px; font-size: .75rem; }
+.kz-mj-total { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.kz-mj-detail { grid-column: 1 / -1; color: var(--lilas); font-size: .85rem; }
+.kz-mj-total.gagne { color: var(--kz-gagne); }
+.kz-mj-total.perdu { color: var(--kz-perdu); }
+.kz-vide { color: var(--lilas); font-size: .95rem; margin: 0; }
+.kz-classement li { display: grid; grid-template-columns: 26px 32px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 0; }
+.kz-rang { color: var(--lilas); font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.kz-classement li:first-child .kz-rang { color: var(--or); }
+.kz-classement .kz-cl-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.kz-classement .kz-cl-solde { font-weight: 700; color: var(--or); font-variant-numeric: tabular-nums; }
+.kz-classement li.moi .kz-cl-nom { color: var(--or); font-weight: 700; }
+.kz-regles p { margin: 0; font-size: .95rem; max-width: 65ch; }
+.kz-paiements { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.kz-paiements td { padding: 5px 0; border-bottom: 1px solid var(--bk-ligne); vertical-align: top; }
+.kz-paiements td:nth-child(2) { color: var(--lilas); padding-inline: 10px; white-space: nowrap; }
+.kz-paiements td:last-child { text-align: right; font-weight: 700; color: var(--or); white-space: nowrap; }
+
+.kz-bandeau-stream { display: none; }
+
+/* ---------- Tablette et téléphone ---------- */
+@media (max-width: 1000px) {
+  .kz-table { grid-template-columns: minmax(0, 1fr); }
+  .kz-cylindre { grid-template-columns: minmax(120px, 190px) minmax(0, 1fr); align-items: center; justify-items: start; width: 100%; }
+  .kz-historique { justify-items: start; }
+  .kz-histo-liste { justify-content: flex-start; }
+  .kz-bas { grid-template-columns: minmax(0, 1fr); }
+  .kz-admin { border-left: 0; padding-left: 0; flex-basis: 100%; }
+}
+@media (max-width: 700px) {
+  .kz-page { padding-bottom: 150px; }
+  .kz-rack {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-radius: 14px 14px 0 0; border-bottom: 0;
+    padding: 10px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, .5); gap: 8px;
+  }
+  .kz-jetons { flex-wrap: nowrap; overflow-x: auto; width: 100%; padding: 6px 2px 2px; }
+  .page-kawazino .kz-choix-jeton { --jeton: 44px; width: 44px; height: 44px; flex: none; font-size: 13px; }
+  .kz-rack-actions { margin-left: 0; width: 100%; }
+  .kz-rack-actions .bk-btn { flex: 1; padding-inline: .5em; }
+  .kz-sur-tapis { flex-basis: 100%; }
+  .kz-minuteur { width: 60px; height: 60px; }
+  .kz-minuteur span { width: 48px; height: 48px; font-size: 1rem; }
+  .kz-table { padding: 12px; border-radius: 18px; }
+  .kz-cylindre { grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kz-jeton, .kz-resultat, .kz-case.gagnant { animation: none; }
+}
+
+/* =========================================================
+   VUE STREAM (kawazino.html?stream) — à capturer dans OBS en 1920×1080
+   ========================================================= */
+.page-kawazino.kz-stream { background: var(--bk-fond); overflow: hidden; }
+.kz-stream .kz-cache-stream { display: none !important; }
+html:has(.kz-stream), .kz-stream { height: 100%; }
+.kz-stream .kz-page {
+  max-width: none; height: 100%; padding-block: 22px;
+  grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px 22px;
+}
+.kz-stream .kz-statut { grid-column: 1; padding: 12px 22px; }
+.kz-stream .kz-phase strong { font-size: 2.4rem; }
+.kz-stream .kz-sous-phase { font-size: 1.15rem; }
+.kz-stream .kz-minuteur { width: 96px; height: 96px; }
+.kz-stream .kz-minuteur span { width: 80px; height: 80px; font-size: 1.7rem; }
+.kz-stream .kz-table, .kz-stream .kz-ferme { grid-column: 1; grid-row: 2; grid-template-columns: 380px minmax(0, 1fr); min-height: 0; }
+.kz-stream .kz-roue-cadre { max-width: 380px; }
+.kz-stream .kz-tapis.horizontal { aspect-ratio: 14 / 6.4; }
+.kz-stream .kz-histo { min-width: 38px; height: 38px; font-size: 1.05rem; }
+.kz-stream .kz-info-pari { display: none; }
+.kz-stream .kz-bas { grid-column: 2; grid-row: 1 / 3; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.kz-stream .kz-panneau-mises { max-height: 100%; overflow: hidden; align-content: start; font-size: 1.05rem; }
+.kz-stream .kz-bandeau-stream {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px;
+  background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px; padding: 14px 22px; font-size: 1.35rem;
+}
+.kz-stream .kz-bandeau-stream strong { color: var(--or); }
+
+
+/* =========================================================
+   KAWAZE GAMES : onglets, crash, course, classement
+   ========================================================= */
+.kz-direct {
+  display: inline-block; margin-left: 7px; padding: .05em .45em; border-radius: 5px;
+  background: var(--rose); color: #fff; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  vertical-align: 2px; animation: kz-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kz-pulse { 50% { opacity: .55; } }
+.kz-ailleurs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.kz-pied { color: var(--lilas); font-size: .9rem; }
+.kz-pied p { margin: 0; max-width: 90ch; }
+.kz-classement-vue { padding-block: 6px 20px; }
+.kz-mon-rang { color: var(--lilas); margin: 14px 0 0; }
+
+/* ---------- Crash ---------- */
+.kz-crash { grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); align-items: stretch; }
+.kz-crash-ciel {
+  position: relative; min-height: 360px; border-radius: 16px; overflow: hidden;
+  background: radial-gradient(ellipse 120% 90% at 0% 100%, var(--kz-tapis), var(--kz-tapis-2) 70%);
+  box-shadow: inset 0 0 0 1px var(--kz-trait);
+}
+#crash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.kz-crash-x {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  font-family: var(--titre-kawaze); font-size: clamp(3rem, 8vw, 7.5rem); line-height: 1; color: var(--papier);
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 6px 30px var(--kz-ombre);
+}
+.kz-crash-sous { position: absolute; left: 50%; top: calc(42% + clamp(2.2rem, 5vw, 4.6rem)); transform: translateX(-50%); color: var(--lilas); white-space: nowrap; font-weight: 500; }
+.kz-crash-ciel.vol .kz-crash-x { color: var(--or); }
+.kz-crash-ciel.boum .kz-crash-x, .kz-crash-ciel.boum .kz-crash-sous { color: var(--kz-perdu); }
+.kz-crash-ciel.boum { animation: kz-secousse .45s; }
+@keyframes kz-secousse { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.kz-crash-cote { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.kz-crash-action { display: grid; gap: 10px; background: var(--kz-voile); border: 1px solid var(--kz-trait); border-radius: 14px; padding: 14px; }
+.kz-crash-action label { display: grid; gap: 4px; font-size: .9rem; color: var(--papier); font-weight: 700; }
+.kz-crash-action input {
+  width: 100%; background: var(--bk-panneau); color: var(--papier); border: 1px solid var(--bk-ligne);
+  border-radius: 8px; padding: .55em .7em; font: inherit; font-variant-numeric: tabular-nums;
+}
+.kz-crash-action .kz-ma-mise { margin: 0; font-size: .95rem; }
+.kz-crash-action .kz-ma-mise b { color: var(--or); }
+.kz-encaisser {
+  width: 100%; border: 0; border-radius: 12px; padding: 16px 12px; cursor: pointer;
+  background: var(--kz-gagne); color: #04150C !important; font-weight: 800; font-size: 1.25rem; line-height: 1.2;
+  box-shadow: 0 6px 20px rgba(79, 208, 143, .35);
+}
+.kz-encaisser small { display: block; font-size: .85rem; font-weight: 700; }
+.kz-encaisser:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.kz-histo.bas { background: var(--kz-rouge); }
+.kz-histo.moyen { background: var(--bk-panneau-2); }
+.kz-histo.haut { background: var(--or); color: var(--nuit); }
+
+/* ---------- Course ---------- */
+.kz-course { grid-template-columns: minmax(0, 1fr); }
+.kz-piste { display: grid; gap: 6px; padding: 10px; border-radius: 16px; background: var(--kz-voile); border: 1px solid var(--kz-trait); }
+.kz-couloir { display: grid; grid-template-columns: minmax(170px, 240px) minmax(0, 1fr); gap: 12px; align-items: stretch; min-height: 64px; }
+.kz-fiche { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "no nom cote" "no qui qui"; column-gap: 10px; align-items: center; align-content: center; min-width: 0; }
+.kz-dossard { grid-area: no; width: 34px; height: 38px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; box-shadow: 0 2px 6px var(--kz-ombre); }
+.kz-fiche-nom { grid-area: nom; font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kz-fiche-nom small { font-weight: 500; color: var(--lilas); margin-left: 6px; }
+.kz-cote { grid-area: cote; font-weight: 800; color: var(--or); font-variant-numeric: tabular-nums; }
+.kz-fiche-qui { grid-area: qui; font-size: .8rem; color: var(--lilas); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kz-fiche-qui b { color: var(--papier); }
+.kz-couloir-piste {
+  position: relative; border-radius: 10px; min-height: 56px; overflow: hidden; border: 0; padding: 0; text-align: left; font: inherit; color: inherit;
+  background: repeating-linear-gradient(90deg, var(--kz-tapis-2) 0 calc(10% - 1px), rgba(255, 255, 255, .06) calc(10% - 1px) 10%);
+}
+button.kz-couloir-piste { cursor: pointer; }
+.kz-couloir-piste:disabled { cursor: default; opacity: 1; color: inherit; }
+button.kz-couloir-piste:hover, button.kz-couloir-piste:focus-visible { box-shadow: inset 0 0 0 2px var(--or); }
+.kz-couloir-piste::after {
+  content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 14px;
+  background: repeating-conic-gradient(var(--papier) 0 25%, var(--kz-noir) 0 50%) 0 0 / 14px 14px;
+}
+.kz-parier {
+  position: absolute; right: 22px; top: 50%; transform: translateY(-50%); z-index: 2;
+  background: var(--or); color: var(--nuit); border-radius: 999px; padding: .25em .8em; font-weight: 800; font-size: .85rem; pointer-events: none;
+}
+.kz-coureur {
+  position: absolute; top: 50%; left: calc((100% - 70px) * var(--p, 0)); transform: translateY(-50%);
+  width: 56px; text-align: center; font-size: clamp(30px, 3.2vw, 46px); line-height: 1; z-index: 1;
+}
+.kz-coureur .em { display: inline-block; transform: scaleX(-1); }
+.kz-course.en-course .kz-coureur .em { animation: kz-trot .3s ease-in-out infinite alternate; }
+.kz-coureur.arret .em { animation: none !important; filter: grayscale(.7); opacity: .7; }
+.kz-coureur.turbo::before {
+  content: ""; position: absolute; right: 80%; top: 50%; width: 60px; height: 6px; transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, var(--or)); border-radius: 3px;
+}
+@keyframes kz-trot { from { transform: scaleX(-1) translateY(2px); } to { transform: scaleX(-1) translateY(-5px); } }
+.kz-couloir.gagnant .kz-couloir-piste { box-shadow: inset 0 0 0 3px var(--or), 0 0 24px var(--kz-lueur); }
+.kz-couloir.gagnant .kz-fiche-nom { color: var(--or); }
+.kz-couloir.mien .kz-dossard { outline: 3px solid var(--or); outline-offset: 2px; }
+.kz-course-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+.kz-commentaire { margin: 0; min-height: 1.5em; font-weight: 700; color: var(--papier); }
+.kz-histo.dossard { border-radius: 6px; }
+
+@media (max-width: 1000px) {
+  .kz-crash { grid-template-columns: minmax(0, 1fr); }
+  .kz-crash-ciel { min-height: 280px; }
+}
+@media (max-width: 700px) {
+  .kz-couloir { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .kz-couloir-piste { min-height: 52px; }
+  .kz-coureur { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kz-direct, .kz-course.en-course .kz-coureur .em, .kz-crash-ciel.boum { animation: none; }
+}
+
+/* Vue stream des nouveaux jeux */
+.kz-stream .kz-table.kz-crash { grid-template-columns: minmax(0, 1fr) 300px; }
+.kz-stream .kz-table.kz-course { grid-template-columns: minmax(0, 1fr); align-content: center; }
+.kz-stream .kz-crash-ciel { min-height: 0; }
+.kz-stream .kz-couloir { min-height: 96px; grid-template-columns: 280px minmax(0, 1fr); }
+.kz-stream .kz-fiche-nom { font-size: 1.3rem; }
+.kz-stream .kz-cote { font-size: 1.3rem; }
+.kz-stream .kz-fiche-qui { font-size: .95rem; }
+.kz-stream .kz-coureur { font-size: 58px; width: 70px; }
+.kz-stream .kz-commentaire { font-size: 1.4rem; }
+.kz-stream .kz-crash-x { font-size: 9rem; }
+.kz-stream .kz-crash-sous { font-size: 1.4rem; top: calc(42% + 5.4rem); }
+
+/* Sur téléphone, les messages s'affichent au-dessus de la barre des jetons */
+@media (max-width: 700px) {
+  .page-kawazino .annonce { bottom: calc(175px + env(safe-area-inset-bottom, 0px)); }
+}

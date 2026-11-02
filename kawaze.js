@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const echap = (t) => String(t ?? "").replace(/[&<>"']/g, (m) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-  const lienSur = (u) => /^(https?:\/\/|\/|[\w-]+\/)/i.test(String(u || "").trim()) ? String(u).trim() : "#";
+  const lienSur = (u) => /^(https?:\/\/|\/|[\w-]+\/|[\w-]+\.html(#[\w-]*)?$)/i.test(String(u || "").trim()) ? String(u).trim() : "#";
   const chemin = (u) => String(u || "").replace(/^\/+/, "");
   const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kawazino</title>
+  <meta name="description" content="Roulette, crash et course : joue tes centimes en direct pendant le live de Kawaze.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="images/icone-paris.png">
+  <link rel="apple-touch-icon" href="images/icone-paris-180.png">
+  <meta property="og:title" content="Kawazino : roulette, crash et course en live">
+  <meta property="og:description" content="Joue tes centimes en direct avec la commu de Kawaze.">
+  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="kawazino.css?v=1">
+</head>
+<body class="page-paris page-kawazino">
+
+  <header class="bk-barre kz-cache-stream">
+    <div class="bk-barre-int">
+      <a class="bk-logo kz-logo" href="kawazino.html">Kawazino</a>
+      <nav class="bk-liens" aria-label="Site">
+        <a href="kawaze-games.html">Kawaze Games</a>
+        <a href="paris.html">Kawaze Paris</a>
+        <a href="https://www.twitch.tv/kawaze" target="_blank" rel="noopener">Live Twitch</a>
+      </nav>
+      <div class="bk-compte" id="compte" aria-live="polite"></div>
+    </div>
+  </header>
+
+  <nav class="bk-onglets kz-cache-stream" aria-label="Jeux">
+    <div class="bk-onglets-int" role="tablist">
+      <button role="tab" data-onglet="roulette" aria-selected="true">Roulette<span class="kz-direct" hidden>live</span></button>
+      <button role="tab" data-onglet="crash" aria-selected="false">Crash<span class="kz-direct" hidden>live</span></button>
+      <button role="tab" data-onglet="course" aria-selected="false">Course<span class="kz-direct" hidden>live</span></button>
+      <button role="tab" data-onglet="classement" aria-selected="false">Classement</button>
+    </div>
+  </nav>
+
+  <div class="kz-page">
+
+    <!-- Barre d'état du tour : phase, minuteur, commandes admin -->
+    <section class="kz-statut kz-vue-jeu" aria-live="polite">
+      <div class="kz-phase">
+        <span class="kz-surtitre" id="surtitre">Roulette</span>
+        <strong id="phase">Chargement…</strong>
+        <span class="kz-sous-phase" id="sous-phase"></span>
+      </div>
+      <div class="kz-minuteur" id="minuteur" hidden><span id="minuteur-texte">1:00</span></div>
+      <div class="kz-admin kz-cache-stream" id="admin" hidden></div>
+    </section>
+
+    <!-- Jeux fermés -->
+    <section class="kz-ferme kz-vue-jeu" id="ferme" hidden>
+      <p class="kz-ferme-titre">Les jeux sont fermés</p>
+      <p>La table ouvre pendant les lives de Kawaze. Ton solde t'attend.</p>
+      <p class="kz-ferme-liens kz-cache-stream">
+        <a class="bk-btn bk-btn-plein" href="https://www.twitch.tv/kawaze" target="_blank" rel="noopener">Suivre sur Twitch</a>
+      </p>
+    </section>
+
+    <!-- ===== Roulette ===== -->
+    <section class="kz-table kz-jeu" id="jeu-roulette" data-jeu="roulette">
+      <div class="kz-cylindre">
+        <div class="kz-roue-cadre">
+          <canvas id="roue" width="640" height="640" aria-label="Roue de roulette européenne"></canvas>
+          <div class="kz-bille-repere" aria-hidden="true"></div>
+          <div class="kz-resultat" id="resultat" hidden></div>
+        </div>
+        <div class="kz-historique">
+          <span class="kz-surtitre">Derniers numéros</span>
+          <div class="kz-histo-liste" id="histo-roulette"></div>
+        </div>
+      </div>
+      <div class="kz-tapis-cadre">
+        <div class="kz-tapis" id="tapis" role="group" aria-label="Tapis de roulette"></div>
+        <p class="kz-info-pari" id="info-pari" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- ===== Crash ===== -->
+    <section class="kz-table kz-jeu kz-crash" id="jeu-crash" data-jeu="crash" hidden>
+      <div class="kz-crash-ciel" id="crash-ciel">
+        <canvas id="crash-canvas" aria-hidden="true"></canvas>
+        <div class="kz-crash-x" id="crash-x">1,00×</div>
+        <div class="kz-crash-sous" id="crash-sous">La fusée attend les mises</div>
+      </div>
+      <div class="kz-crash-cote">
+        <div class="kz-crash-action kz-cache-stream" id="crash-action"></div>
+        <div class="kz-historique">
+          <span class="kz-surtitre">Derniers vols</span>
+          <div class="kz-histo-liste" id="histo-crash"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Course ===== -->
+    <section class="kz-table kz-jeu kz-course" id="jeu-course" data-jeu="course" hidden>
+      <div class="kz-piste" id="piste"></div>
+      <div class="kz-course-pied">
+        <p class="kz-commentaire" id="commentaire" aria-live="polite"></p>
+        <div class="kz-historique">
+          <span class="kz-surtitre">Derniers gagnants</span>
+          <div class="kz-histo-liste" id="histo-course"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Les jetons du joueur -->
+    <section class="kz-rack kz-cache-stream kz-vue-jeu" id="rack" aria-label="Tes jetons">
+      <div class="kz-jetons" role="radiogroup" aria-label="Valeur du jeton" id="jetons"></div>
+      <div class="kz-rack-actions">
+        <span class="kz-sur-tapis" id="sur-tapis"></span>
+        <button class="bk-btn bk-btn-ligne bk-btn-petit" type="button" data-action="gomme" id="btn-gomme" aria-pressed="false">Reprendre un jeton</button>
+        <button class="bk-btn bk-btn-ligne bk-btn-petit" type="button" data-action="tout-reprendre" id="btn-tout">Tout reprendre</button>
+        <button class="bk-btn bk-btn-ligne bk-btn-petit" type="button" data-action="remiser" id="btn-remiser">Remettre mes mises</button>
+      </div>
+      <div class="kz-confirmer" id="confirmer" hidden></div>
+    </section>
+
+    <!-- Le bas : mises du tour et règles du jeu affiché -->
+    <section class="kz-bas kz-vue-jeu">
+      <article class="kz-panneau kz-panneau-mises">
+        <header class="kz-panneau-tete"><h2>Mises du tour</h2><span class="kz-pot" id="pot">0</span></header>
+        <ol class="kz-liste-mises" id="liste-mises"></ol>
+      </article>
+
+      <article class="kz-panneau kz-regles kz-cache-stream" data-regles="roulette">
+        <header class="kz-panneau-tete"><h2>La roulette</h2></header>
+        <p>Choisis un jeton, puis clique sur le tapis : sur un numéro, sur la ligne entre deux numéros (cheval), au croisement de quatre (carré), au bord d'une rangée (transversale) ou entre deux rangées (sixain). Tu peux empiler plusieurs jetons.</p>
+        <table class="kz-paiements">
+          <tbody>
+            <tr><td>Plein</td><td>1 numéro</td><td>35 contre 1</td></tr>
+            <tr><td>Cheval</td><td>2 numéros</td><td>17 contre 1</td></tr>
+            <tr><td>Transversale, trio</td><td>3 numéros</td><td>11 contre 1</td></tr>
+            <tr><td>Carré, premier quatre</td><td>4 numéros</td><td>8 contre 1</td></tr>
+            <tr><td>Sixain</td><td>6 numéros</td><td>5 contre 1</td></tr>
+            <tr><td>Douzaine, colonne</td><td>12 numéros</td><td>2 contre 1</td></tr>
+            <tr><td>Rouge, noir, pair, impair, manque, passe</td><td>18 numéros</td><td>1 contre 1</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Dans le chat :</strong> <code>!mise 50 rouge</code>, ou plusieurs paris d'un coup : <code>!mise 50 c2 rouge</code> met 50 sur la 2e colonne et 50 sur rouge. Paris possibles dans le chat : rouge, noir, pair, impair, manque, passe, <code>c1</code> à <code>c3</code> (colonnes), <code>d1</code> à <code>d3</code> (douzaines) et les numéros. Les chevaux, carrés, transversales et sixains se posent sur le tapis.</p>
+        <p><code>!change 100 noir</code> remplace tes mises du tour, <code>!annule</code> les reprend toutes.</p>
+      </article>
+
+      <article class="kz-panneau kz-regles kz-cache-stream" data-regles="crash" hidden>
+        <header class="kz-panneau-tete"><h2>Le crash</h2></header>
+        <p>Mise avant le décollage. La fusée monte et ton gain avec elle : 2× après 7 secondes, 5× après 16, 10× après 23. Encaisse quand tu veux, avant qu'elle explose. Si elle explose avant, tu perds ta mise.</p>
+        <p>L'<strong>encaissement automatique</strong> encaisse pour toi dès que la fusée atteint ton multiplicateur.</p>
+        <p class="bk-discret">Une fois sur 25 environ, la fusée explose au décollage. Une fois sur deux elle dépasse 2×, une fois sur dix 10×.</p>
+        <p><strong>Dans le chat :</strong> <code>!mise 50</code>, <code>!mise 50 2,5</code> pour encaisser tout seul à 2,5×, puis <code>!cash</code> pendant le vol. <code>!change 80 3</code> remplace ta mise, <code>!annule</code> la reprend. Attention : le stream a quelques secondes de retard, le bouton du site est en temps réel.</p>
+      </article>
+
+      <article class="kz-panneau kz-regles kz-cache-stream" data-regles="course" hidden>
+        <header class="kz-panneau-tete"><h2>La course</h2></header>
+        <p>Six coureurs, un seul gagnant. Choisis un jeton et mise sur un ou plusieurs coureurs. Si ton coureur gagne, tu touches ta mise multipliée par sa cote.</p>
+        <p>Chaque coureur a son caractère : le cheval se cabre, le canard s'envole, la poule s'arrête pour picorer, l'escargot peut passer en mode fusée, le cochon se roule dans la boue ou charge, et la tortue ne s'arrête jamais. Les cotes viennent de 400 000 courses simulées.</p>
+        <p><strong>Dans le chat :</strong> <code>!mise 50 3</code>, <code>!mise 50 poule</code>, ou plusieurs coureurs : <code>!mise 50 poule tortue</code> (50 sur chacun). <code>!change</code> remplace tes mises, <code>!annule</code> les reprend.</p>
+      </article>
+    </section>
+
+    <!-- Classement -->
+    <section class="kz-classement-vue" id="vue-classement" hidden>
+      <h1 class="bk-titre">Classement</h1>
+      <p class="bk-sous-titre">Les 20 plus gros portefeuilles de la commu, tous jeux confondus (Kawaze Paris compris).</p>
+      <ol class="bk-classement" id="classement"></ol>
+      <p class="kz-mon-rang" id="mon-rang"></p>
+    </section>
+
+    <!-- Bandeau pour le stream -->
+    <footer class="kz-bandeau-stream">
+      <span>Joue sur <strong>kawaze.github.io/kawazino.html</strong></span>
+      <span id="bandeau-chat">ou dans le chat : <code>!mise 50 rouge</code> · <code>!solde</code></span>
+    </footer>
+
+    <footer class="kz-pied kz-cache-stream">
+      <p>Centimes de départ : 1 000, puis 100 gratuits par jour. Recharge avec la récompense de points de chaîne « Kawaze Games » sur Twitch. <code>!solde</code> dans le chat affiche ton solde. Les centimes ne s'achètent pas et ne valent pas d'argent : c'est pour le fun et le classement.</p>
+    </footer>
+  </div>
+
+  <div class="annonce" id="annonce" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
+  <script src="paris-config.js?v=7"></script>
+  <script src="kawazino.js?v=1"></script>
+</body>
+</html>

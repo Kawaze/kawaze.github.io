@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kawaze Games</title>
+  <meta name="description" content="Les jeux de la commu de Kawaze : Kawaze Paris, Kawazino et Centimes Drop.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="images/icone-paris.png">
+  <meta property="og:title" content="Kawaze Games">
+  <meta property="og:description" content="Paris esport, casino en live et quiz : les jeux de la commu de Kawaze.">
+  <link rel="stylesheet" href="style.css?v=8">
+  <style>
+    .kg-titre-logo { font-family: var(--titre-kawaze); font-size: 1.45rem; color: var(--or); text-decoration: none; white-space: nowrap; }
+    .kg-page { max-width: 1240px; margin: 0 auto; padding: 36px 16px 56px; display: grid; gap: 28px; }
+    .kg-intro h1 { font-family: var(--titre-kawaze); font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1; margin: 0 0 12px; color: var(--or); }
+    .kg-intro p { margin: 0; color: var(--lilas); max-width: 62ch; font-size: 1.05rem; }
+    .kg-jeux { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .kg-jeu {
+      background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px;
+      padding: 22px; display: grid; gap: 14px; align-content: start; grid-template-rows: auto auto 1fr auto;
+    }
+    .kg-entete { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 40px; }
+    .kg-entete img { height: 36px; width: auto; }
+    .kg-nom { font-family: var(--titre-kawaze); font-weight: 400; font-size: 1.45rem; line-height: 1.05; margin: 0; }
+    .kg-etat { font-size: .78rem; font-weight: 700; padding: .25em .6em; border-radius: 6px; white-space: nowrap; }
+    .kg-ouvert { color: var(--bk-vert); background: rgba(52,194,122,.12); }
+    .kg-live { color: var(--rose); background: rgba(229,72,77,.12); }
+    .kg-accroche { margin: 0; font-weight: 700; font-size: 1.05rem; }
+    .kg-details { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--lilas); font-size: .95rem; }
+    .kg-details li { padding-left: 16px; position: relative; }
+    .kg-details li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--or); }
+    .kg-jeu .bk-btn { text-align: center; }
+    .kg-note { color: var(--lilas); font-size: .9rem; border-top: 1px solid var(--bk-ligne); padding-top: 16px; margin: 0; max-width: 80ch; }
+    @media (max-width: 900px) { .kg-jeux { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body class="page-paris">
+
+  <header class="bk-barre">
+    <div class="bk-barre-int">
+      <a class="kg-titre-logo" href="kawaze-games.html">Kawaze Games</a>
+      <nav class="bk-liens" aria-label="Liens">
+        <a href="https://www.twitch.tv/kawaze" target="_blank" rel="noopener">Live Twitch</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="kg-page">
+    <section class="kg-intro">
+      <h1>Kawaze Games</h1>
+      <p>Les jeux de la commu de Kawaze. Connecte-toi une fois avec Twitch : tes centimes sont les mêmes sur Kawaze Paris et au Kawazino.</p>
+    </section>
+
+    <section class="kg-jeux" aria-label="Les jeux">
+      <article class="kg-jeu">
+        <div class="kg-entete">
+          <img src="images/logo-kawaze-paris.png" alt="Kawaze Paris" width="210" height="36">
+          <span class="kg-etat kg-ouvert">Ouvert</span>
+        </div>
+        <p class="kg-accroche">Parie sur les matchs des Worlds.</p>
+        <ul class="kg-details">
+          <li>Les matchs arrivent tout seuls, avec les cotes en direct.</li>
+          <li>Paris ouverts jusqu'à 5 min après le début, cash out jusqu'à 10 min.</li>
+          <li>Classement de la commu.</li>
+        </ul>
+        <a class="bk-btn bk-btn-plein bk-btn-large" href="paris.html">Parier sur Kawaze Paris</a>
+      </article>
+
+      <article class="kg-jeu">
+        <div class="kg-entete">
+          <h2 class="kg-nom">Kawazino</h2>
+          <span class="kg-etat kg-live">Pendant les lives</span>
+        </div>
+        <p class="kg-accroche">Roulette, crash et course d'animaux, en direct.</p>
+        <ul class="kg-details">
+          <li>Mise sur le site ou depuis le chat Twitch.</li>
+          <li>Un tour à la fois, celui qui passe sur le stream.</li>
+          <li>La table ouvre quand Kawaze est en live.</li>
+        </ul>
+        <a class="bk-btn bk-btn-plein bk-btn-large" href="kawazino.html">Entrer au Kawazino</a>
+      </article>
+
+      <article class="kg-jeu">
+        <div class="kg-entete">
+          <h2 class="kg-nom">Centimes Drop</h2>
+          <span class="kg-etat kg-live">Pendant les lives</span>
+        </div>
+        <p class="kg-accroche">Le quiz en live.</p>
+        <ul class="kg-details">
+          <li>Répartis tes centimes sur les bonnes réponses avant l'ouverture des trappes.</li>
+          <li>Les parties se jouent en direct avec Kawaze.</li>
+          <li>Le jeu peut mettre une minute à se réveiller au premier clic.</li>
+        </ul>
+        <a class="bk-btn bk-btn-plein bk-btn-large" href="https://centimes-drop.onrender.com/player.html" target="_blank" rel="noopener">Jouer à Centimes Drop</a>
+      </article>
+    </section>
+
+    <p class="kg-note">Les centimes sont gratuits : 1 000 pour commencer, 100 de plus chaque jour, et des recharges avec les points de chaîne Twitch. Ils ne s'achètent pas et ne valent pas d'argent, c'est pour le fun et le classement.</p>
+  </main>
+</body>
+</html>
