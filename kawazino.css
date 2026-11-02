@@ -422,3 +422,19 @@ button.kz-couloir-piste:hover, button.kz-couloir-piste:focus-visible { box-shado
 @media (max-width: 700px) {
   .page-kawazino .annonce { bottom: calc(175px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Croupier : pourboires */
+.kz-croupier { order: 5; }
+.kz-croupier p { margin: 0; }
+.kz-tips { display: flex; flex-wrap: wrap; gap: 8px; }
+.kz-derniers-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .9rem; color: var(--lilas); }
+.kz-derniers-tips b { color: var(--papier); }
+
+/* Admin : donner des centimes */
+.kz-admin-don { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--bk-panneau); border: 1px dashed var(--or); border-radius: 12px; padding: 10px 14px; }
+.kz-admin-don .kz-etiquette { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--or); }
+.kz-admin-don label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--lilas); }
+.kz-admin-don input { font: inherit; color: var(--papier); background: var(--bk-fond); border: 1px solid var(--bk-ligne); border-radius: 8px; padding: .4em .6em; width: 150px; min-width: 0; }
+.kz-admin-don input[type="number"] { width: 110px; }
+.kz-admin-don input:focus { border-color: var(--or); outline: none; }
+@media (max-width: 600px) { .kz-admin-don label, .kz-admin-don input { width: 100%; } }

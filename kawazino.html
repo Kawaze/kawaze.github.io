@@ -13,7 +13,7 @@
   <meta property="og:title" content="Kawazino : roulette, crash et course en live">
   <meta property="og:description" content="Joue tes centimes en direct avec la commu de Kawaze.">
   <link rel="stylesheet" href="style.css?v=7">
-  <link rel="stylesheet" href="kawazino.css?v=1">
+  <link rel="stylesheet" href="kawazino.css?v=2">
 </head>
 <body class="page-paris page-kawazino">
 
@@ -50,6 +50,15 @@
       <div class="kz-minuteur" id="minuteur" hidden><span id="minuteur-texte">1:00</span></div>
       <div class="kz-admin kz-cache-stream" id="admin" hidden></div>
     </section>
+
+    <!-- Admin : donner des centimes -->
+    <form class="kz-admin-don kz-cache-stream" id="admin-don" hidden autocomplete="off">
+      <span class="kz-etiquette">Give</span>
+      <label for="don-nom">Pseudo<input id="don-nom" placeholder="pseudo Twitch" required></label>
+      <label for="don-montant">Centimes<input id="don-montant" type="number" min="1" max="1000000" step="1" value="500" inputmode="numeric" required></label>
+      <button class="bk-btn bk-btn-plein bk-btn-petit" type="submit">Donner</button>
+      <span class="bk-discret">Créés à partir de rien. Dans le chat : <code>!give @pseudo 500</code></span>
+    </form>
 
     <!-- Jeux fermés -->
     <section class="kz-ferme kz-vue-jeu" id="ferme" hidden>
@@ -126,6 +135,14 @@
         <ol class="kz-liste-mises" id="liste-mises"></ol>
       </article>
 
+      <article class="kz-panneau kz-croupier kz-cache-stream" id="croupier">
+        <header class="kz-panneau-tete"><h2>Le croupier</h2></header>
+        <p>Un pourboire pour Kawaze ? Les centimes vont dans sa banque.</p>
+        <div class="kz-tips" id="tips"></div>
+        <ol class="kz-derniers-tips" id="derniers-tips"></ol>
+        <p class="bk-discret">Dans le chat : <code>!tip 100</code></p>
+      </article>
+
       <article class="kz-panneau kz-regles kz-cache-stream" data-regles="roulette">
         <header class="kz-panneau-tete"><h2>La roulette</h2></header>
         <p>Choisis un jeton, puis clique sur le tapis : sur un numéro, sur la ligne entre deux numéros (cheval), au croisement de quatre (carré), au bord d'une rangée (transversale) ou entre deux rangées (sixain). Tu peux empiler plusieurs jetons.</p>
@@ -146,7 +163,7 @@
 
       <article class="kz-panneau kz-regles kz-cache-stream" data-regles="crash" hidden>
         <header class="kz-panneau-tete"><h2>Le crash</h2></header>
-        <p>Mise avant le décollage. La fusée monte et ton gain avec elle : 2× après 7 secondes, 5× après 16, 10× après 23. Encaisse quand tu veux, avant qu'elle explose. Si elle explose avant, tu perds ta mise.</p>
+        <p>Mise avant le décollage. La fusée monte et ton gain avec elle : 2× après 10 secondes, 5× après 23, 10× après 33. Encaisse quand tu veux, avant qu'elle explose. Si elle explose avant, tu perds ta mise.</p>
         <p>L'<strong>encaissement automatique</strong> encaisse pour toi dès que la fusée atteint ton multiplicateur.</p>
         <p class="bk-discret">Une fois sur 25 environ, la fusée explose au décollage. Une fois sur deux elle dépasse 2×, une fois sur dix 10×.</p>
         <p><strong>Dans le chat :</strong> <code>!mise 50</code>, <code>!mise 50 2,5</code> pour encaisser tout seul à 2,5×, puis <code>!cash</code> pendant le vol. <code>!change 80 3</code> remplace ta mise, <code>!annule</code> la reprend. Attention : le stream a quelques secondes de retard, le bouton du site est en temps réel.</p>
@@ -175,7 +192,7 @@
     </footer>
 
     <footer class="kz-pied kz-cache-stream">
-      <p>Centimes de départ : 1 000, puis 100 gratuits par jour. Recharge avec la récompense de points de chaîne « Kawaze Games » sur Twitch. <code>!solde</code> dans le chat affiche ton solde. Les centimes ne s'achètent pas et ne valent pas d'argent : c'est pour le fun et le classement.</p>
+      <p>Centimes de départ : 1 000, puis 100 gratuits par jour. Recharge sur Twitch avec la récompense de points de chaîne (10 000 kawaflouze = 1 000 centimes). <code>!solde</code> dans le chat affiche ton solde. Les centimes ne s'achètent pas et ne valent pas d'argent : c'est pour le fun et le classement.</p>
     </footer>
   </div>
 
@@ -183,6 +200,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
   <script src="paris-config.js?v=7"></script>
-  <script src="kawazino.js?v=1"></script>
+  <script src="kawazino.js?v=2"></script>
 </body>
 </html>

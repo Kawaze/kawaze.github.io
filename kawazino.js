@@ -27,7 +27,7 @@
   const JETONS = [10, 50, 100, 500, 1000, 5000];
   const ROTATION_MS = 8000;                 // durée de la bille
   const ENCHAINER_APRES_MS = 12000;         // pause entre deux tours en mode « enchaîner »
-  const VITESSE_CRASH = 0.1;                // identique à kz_vitesse_crash() dans la base
+  const VITESSE_CRASH = 0.07;                // identique à kz_vitesse_crash() dans la base
   const TACTILE = window.matchMedia("(hover: none)").matches;
   const REDUIT = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const ROUGES = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -308,6 +308,24 @@
       etat.rang = c.error ? null : (c.count || 0) + 1;
     }
   }
+  async function chargerDons() {
+    const r = await sb.from("kz_dons").select("id, de_pseudo, montant, cree_le").eq("type", "tip").order("id", { ascending: false }).limit(6);
+    if (!r.error) etat.tips = r.data || [];
+  }
+  function rendreCroupier() {
+    const el = $("croupier");
+    if (!el) return;
+    el.hidden = STREAM || etat.onglet === "classement";
+    $("tips").innerHTML = etat.session
+      ? [50, 100, 500].map((v) => `<button class="bk-btn bk-btn-ligne bk-btn-petit" type="button" data-action="tip" data-montant="${v}">Tip ${nombre(v)} c</button>`).join("")
+      : `<button class="bk-btn bk-btn-twitch bk-btn-petit" data-action="connexion">Se connecter pour tiper</button>`;
+    const t = etat.tips || [];
+    $("derniers-tips").innerHTML = t.length
+      ? t.map((x) => `<li><b>${echap(x.de_pseudo || "Quelqu'un")}</b> · ${nombre(x.montant)} c</li>`).join("")
+      : `<li class="bk-discret">Pas encore de pourboire ce soir.</li>`;
+    $("admin-don").hidden = STREAM || !estAdmin() || etat.onglet === "classement";
+  }
+
   async function chargerProfil() {
     if (!etat.session) { etat.profil = null; return; }
     const r = await sb.rpc("synchroniser_profil");
@@ -335,7 +353,7 @@
   async function toutRecharger() {
     try {
       await Promise.all([chargerEtat(), synchroniserHeure()]);
-      await Promise.all([chargerProfil(), chargerTour(), chargerHistoriques(), chargerClassement(), chargerCoureurs()]);
+      await Promise.all([chargerProfil(), chargerTour(), chargerHistoriques(), chargerClassement(), chargerCoureurs(), chargerDons()]);
     } catch (e) {
       if (etat.installe) annoncer(messageErreur(e), "erreur");
     }
@@ -731,7 +749,8 @@
         html = `${ma ? `<p class="kz-ma-mise">Ta mise : <b>${nombre(ma.mise)} c</b>${ma.auto ? ` · encaissement auto à <b>${fx(ma.auto)}</b>` : ""}</p>` : `<p class="kz-ma-mise">Choisis un jeton plus bas, puis mise.</p>`}
           <label for="crash-auto">Encaisser tout seul à (facultatif)
             <input id="crash-auto" inputmode="decimal" placeholder="ex. 2,5" value="${ma && ma.auto ? String(ma.auto).replace(".", ",") : ""}" autocomplete="off"></label>
-          <button class="bk-btn bk-btn-plein bk-btn-large" type="button" data-action="crash-miser">${ma ? "Ajouter" : "Miser"} ${nombre(etat.jeton)} c</button>`;
+          <button class="bk-btn bk-btn-plein bk-btn-large" type="button" data-action="crash-miser">${ma ? "Ajouter" : "Miser"} ${nombre(etat.jeton)} c</button>
+          ${ma ? `<button class="bk-btn bk-btn-ligne" type="button" data-action="crash-reprendre">Reprendre ma mise (${nombre(ma.mise)} c)</button>` : ""}`;
       } else if ((ph === "vol" || ph === "decollage") && ma) {
         if (ma.cash != null) html = `<p class="kz-ma-mise">Encaissé à <b>${fx(ma.cash)}</b> : <b>+${nombre(ma.gain - ma.mise)} c</b></p>`;
         else if (autoAtteint) html = `<p class="kz-ma-mise">Encaissé automatiquement à <b>${fx(ma.auto)}</b> : <b>+${nombre(Math.floor(ma.mise * ma.auto) - ma.mise)} c</b></p>`;
@@ -869,7 +888,7 @@
   }
   function poser(cle, auto) {
     if (!peutMiser()) return;
-    if (etat.gomme && jeuAffiche() === "roulette") { reprendre(cle); return; }
+    if (etat.gomme && ["roulette", "course"].includes(jeuAffiche())) { reprendre(cle); return; }
     const mise = etat.jeton;
     if (solde() < mise) { annoncer(`Solde insuffisant : tu as ${nombre(solde())} centimes.`, "erreur"); return; }
     const tourId = etat.tour.id;
@@ -938,15 +957,35 @@
       await apresAction();
     });
   }
-  function encaisser() {
-    enFile(async () => {
-      try {
-        const r = await appel("kz_encaisser");
-        if (etat.profil && r) etat.profil.solde = r.solde;
-        annoncer(`Encaissé à ${fx(r.cash)} : ${nombre(r.gain)} centimes !`, "ok");
-      } catch (e) { annoncer(messageErreur(e), "erreur"); }
-      await apresAction();
-    });
+  let encaissementEnCours = false;
+  async function encaisser(bouton) {
+    if (encaissementEnCours) return;
+    encaissementEnCours = true;
+    const b = bouton || $("btn-encaisser");
+    if (b) { b.disabled = true; b.firstChild && (b.firstChild.textContent = "Encaissement…"); }
+    // appel direct (sans file d'attente) : chaque dixième de seconde compte
+    let essai = 0, r = null, erreur = null;
+    while (essai < 3) {
+      try { r = await appel("kz_encaisser"); erreur = null; break; }
+      catch (e) {
+        erreur = e;
+        // cliqué pile au décollage : on réessaie tout de suite
+        if (/pas encore décollé/i.test(e && e.message || "")) { essai++; await new Promise((ok) => setTimeout(ok, 250)); continue; }
+        break;
+      }
+    }
+    encaissementEnCours = false;
+    if (r) {
+      if (etat.profil) etat.profil.solde = r.solde;
+      const ma = etat.mises.find((m) => m.joueur === moi() && m.cle === "crash");
+      if (ma) { ma.cash = r.cash; ma.gain = r.gain; }
+      annoncer(`Encaissé à ${fx(r.cash)} : ${nombre(r.gain)} centimes !`, "ok");
+    } else {
+      annoncer(messageErreur(erreur), "erreur");
+    }
+    signatureActionCrash = "";   // redessine le bouton, qui n'est jamais laissé bloqué
+    rendreJeu(); rendreCompte();
+    chargerMises().then(() => rendreJeu()).catch(() => {});
   }
   function mesTotaux() {
     let mise = 0, gain = 0;
@@ -1117,12 +1156,12 @@
     const m = mesTotaux();
     $("sur-tapis").innerHTML = m.mise ? `Ta mise : <b>${nombre(m.mise)} c</b>` : (etat.session ? "Aucune mise sur ce tour" : "");
     const actif = phase() === "mises" && !!etat.session;
-    $("btn-gomme").hidden = j !== "roulette";
+    $("btn-gomme").hidden = !["roulette", "course"].includes(j);
     $("btn-remiser").hidden = j !== "roulette";
     $("btn-gomme").disabled = !actif || !m.mise;
     $("btn-tout").disabled = !actif || !m.mise;
     $("btn-remiser").disabled = !actif;
-    if ((!m.mise || j !== "roulette") && etat.gomme) etat.gomme = false;
+    if ((!m.mise || !["roulette", "course"].includes(j)) && etat.gomme) etat.gomme = false;
     $("btn-gomme").setAttribute("aria-pressed", etat.gomme ? "true" : "false");
   }
 
@@ -1201,6 +1240,7 @@
     rendreCompte();
     rendreStatut();
     rendreJeu();
+    rendreCroupier();
   }
 
   function changerOnglet(nom) {
@@ -1255,6 +1295,20 @@
           .then((r) => { if (r.error) annoncer(messageErreur(r.error), "erreur"); });
         break;
       case "deconnexion": sb.auth.signOut(); break;
+      case "tip": {
+        if (!etat.session) return;
+        const montant = Number(b.dataset.montant);
+        if (solde() < montant) { annoncer(`Solde insuffisant : tu as ${nombre(solde())} centimes.`, "erreur"); return; }
+        enFile(async () => {
+          try {
+            const r = await appel("kz_tip", { p_montant: montant });
+            if (etat.profil && r) etat.profil.solde = r.solde;
+            annoncer(`Merci pour le croupier ! ${nombre(montant)} centimes offerts.`, "ok");
+          } catch (e) { annoncer(messageErreur(e), "erreur"); }
+          await chargerDons(); rendreCompte(); rendreCroupier();
+        });
+        break;
+      }
       case "bonus":
         appel("bonus_du_jour").then(() => { annoncer("+100 centimes ajoutés !", "ok"); return chargerProfil(); })
           .catch((e) => annoncer(messageErreur(e), "erreur")).then(rendreCompte);
@@ -1274,7 +1328,8 @@
         poser("crash", auto);
         break;
       }
-      case "crash-encaisser": b.disabled = true; encaisser(); break;
+      case "crash-encaisser": encaisser(b); break;
+      case "crash-reprendre": if (peutMiser()) reprendre("crash"); break;
       case "admin-tour": admin(() => appel("kz_nouveau_tour", { p_jeu: jeuAffiche(), p_duree: etat.kz.duree_mises })); break;
       case "admin-tirer": admin(() => appel("kz_tirer", { p_tour: etat.tour.id })); break;
       case "admin-annuler":
@@ -1285,6 +1340,20 @@
     }
   });
   // changer l'encaissement automatique après avoir misé
+  $("admin-don").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const nom = $("don-nom").value.trim(), montant = Math.floor(Number($("don-montant").value) || 0);
+    if (!nom || montant < 1) { annoncer("Indique un pseudo et un nombre de centimes.", "erreur"); return; }
+    enFile(async () => {
+      try {
+        const r = await appel("kz_donner", { p_nom: nom, p_montant: montant });
+        annoncer(`${nombre(r.montant)} centimes donnés à ${r.pseudo}.`, "ok");
+        $("don-nom").value = "";
+        chargerClassement().then(() => rendreClassement && rendreClassement()).catch(() => {});
+      } catch (e) { annoncer(messageErreur(e), "erreur"); }
+    });
+  });
+
   document.addEventListener("change", (ev) => {
     if (ev.target.id !== "crash-auto" || phase() !== "mises") return;
     const ma = misesDuJeu().find((m) => m.joueur === moi());
@@ -1310,6 +1379,10 @@
   // Temps réel
   // =====================================================================
   sb.channel("kawaze-games")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "kz_dons" }, () => {
+      chargerDons().then(rendreCroupier).catch(() => {});
+      chargerProfil().then(rendreCompte).catch(() => {});
+    })
     .on("postgres_changes", { event: "*", schema: "public", table: "kz_etat" }, (p) => {
       if (p.new && p.new.id === 1) { etat.kz = p.new; rendreTout(); }
     })
@@ -1349,7 +1422,7 @@
       }, Math.random() * 1200);
     }
     // crash en vol : demander à la base si la fusée a explosé (environ chaque seconde)
-    if (t && t.jeu === "crash" && t.statut === "vol" && maintenant() > Date.parse(t.depart) && Date.now() - etat.suiviVol > 900 + Math.random() * 400) {
+    if (t && t.jeu === "crash" && t.statut === "vol" && maintenant() > Date.parse(t.depart) && Date.now() - etat.suiviVol > 450 + Math.random() * 200) {
       etat.suiviVol = Date.now();
       const id = t.id;
       appel("kz_suivre_vol", { p_tour: id }).then((r) => {
