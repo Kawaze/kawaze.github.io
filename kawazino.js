@@ -691,7 +691,8 @@
     const pasS = [2, 5, 10, 20, 30].find((p) => sMax / p <= 6) || 60;
     x.textAlign = "center";
     for (let s = pasS; s <= sMax - pasS * 0.3; s += pasS) x.fillText(s + " s", X(s), H - 12);
-    if (vol.s <= 0) return;
+    const tailleFusee = Math.max(34, Math.min(56, W * 0.042));
+    if (vol.s <= 0) { emojiFusee(x, X(0) + tailleFusee * 0.45, Y(1) - tailleFusee * 0.55, -Math.PI / 2, tailleFusee); return; }
     const coul = vol.fini ? v("--kz-perdu") : v("--or");
     x.beginPath(); x.moveTo(X(0), Y(1));
     for (let i = 1; i <= 100; i++) { const s = vol.s * i / 100; x.lineTo(X(s), Y(Math.min(vol.x, xAuTemps(s)))); }
@@ -713,10 +714,28 @@
         x.fillStyle = v("--papier"); x.fillText(texte, px + 10, py - 9);
       }
     }
-    x.beginPath(); x.arc(X(vol.s), Y(vol.x), 9, 0, Math.PI * 2);
-    x.fillStyle = vol.fini ? coul : v("--papier"); x.fill();
-    x.lineWidth = 3; x.strokeStyle = coul; x.stroke();
+    // la fusée 🚀 au bout de la courbe, dans le sens de la montée ; 💥 quand elle explose
+    const bx = X(vol.s), by = Y(vol.x);
+    if (vol.fini) {
+      emojiTexte(x, "💥", bx, by, 0, tailleFusee * 1.4);
+    } else {
+      const ds = Math.max(0.05, vol.s * 0.02);
+      const angle = Math.atan2(by - Y(xAuTemps(vol.s - ds)), bx - X(vol.s - ds));
+      const tremble = () => (Math.random() - 0.5) * 1.6;
+      emojiFusee(x, bx + tremble(), by + tremble(), angle, tailleFusee);
+    }
   }
+  const POLICE_EMOJI = "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+  function emojiTexte(x, e, px, py, rot, taille) {
+    x.save();
+    x.translate(px, py); x.rotate(rot);
+    x.font = `${taille}px ${POLICE_EMOJI}`;
+    x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = "#fff";
+    x.fillText(e, 0, 0);
+    x.restore();
+  }
+  // l'emoji 🚀 pointe vers le haut à droite (-45°) : on le tourne pour qu'il suive « angle »
+  const emojiFusee = (x, px, py, angle, taille) => emojiTexte(x, "🚀", px, py, angle + Math.PI / 4, taille);
   function rendreCrash() {
     const ph = phase(), vol = etatVol(), t = tourDuJeu();
     ciel.classList.toggle("vol", ph === "vol");

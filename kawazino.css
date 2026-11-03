@@ -19,6 +19,8 @@
 }
 
 .kz-logo { font-size: clamp(1.05rem, 4.6vw, 1.6rem); white-space: nowrap; letter-spacing: .02em; text-shadow: 0 .08em 0 var(--rose); }
+.kz-logo img { height: 40px; width: auto; }
+@media (max-width: 420px) { .kz-logo img { height: 32px; } }
 .kz-page {
   max-width: 1400px; margin: 0 auto;
   padding-block: 18px 40px;
@@ -292,6 +294,8 @@ html:has(.kz-stream), .kz-stream { height: 100%; }
   background: var(--bk-panneau); border: 1px solid var(--bk-ligne); border-radius: 14px; padding: 14px 22px; font-size: 1.35rem;
 }
 .kz-stream .kz-bandeau-stream strong { color: var(--or); }
+.kz-stream .kz-bandeau-stream { align-items: center; }
+.kz-bandeau-logo { height: 46px; width: auto; display: block; }
 
 
 /* =========================================================
