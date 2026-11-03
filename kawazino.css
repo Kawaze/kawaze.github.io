@@ -442,3 +442,23 @@ button.kz-couloir-piste:hover, button.kz-couloir-piste:focus-visible { box-shado
 .kz-admin-don input[type="number"] { width: 110px; }
 .kz-admin-don input:focus { border-color: var(--or); outline: none; }
 @media (max-width: 600px) { .kz-admin-don label, .kz-admin-don input { width: 100%; } }
+
+/* ===== Onglet Admin (visible seulement pour Kawaze) ===== */
+.kz-admin-vue { padding-block: 6px 20px; display: grid; gap: 14px; align-content: start; }
+.kz-admin-vue .bk-titre, .kz-admin-vue .bk-sous-titre { margin: 0; }
+.kz-admin-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
+.kz-admin-grille .kz-panneau { display: grid; gap: 12px; align-content: start; }
+.kz-admin-grille .kz-panneau p { margin: 0; }
+.kz-admin-grille code { overflow-wrap: anywhere; }
+.kz-admin-reglages { display: grid; gap: 12px; }
+.kz-admin-reglages label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.kz-admin-reglages label span { display: grid; gap: 2px; }
+.kz-admin-reglages small { color: var(--lilas); font-size: .85rem; }
+.kz-admin-reglages input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--or); flex: none; }
+.kz-admin-reglages .kz-reglage-duree { align-items: center; justify-content: space-between; cursor: default; }
+.kz-admin-reglages select { background: var(--bk-panneau-2); color: var(--papier); border: 1px solid var(--bk-ligne); border-radius: 8px; padding: .4em .5em; font: inherit; }
+.kz-admin-vue .kz-admin-don { background: none; border: 0; padding: 0; }
+.kz-admin-vue .kz-admin-don label { flex: 1 1 140px; display: grid; gap: 4px; }
+.kz-admin-vue .kz-admin-don input { width: 100%; }
+.kz-admin-vue .kz-admin-don button { align-self: end; }
+.kz-admin:empty { display: none; }

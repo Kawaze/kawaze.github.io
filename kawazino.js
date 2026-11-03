@@ -203,8 +203,9 @@
   try { etat.enchainer = localStorage.getItem("kz-enchainer") === "1"; } catch (e) { /* rien */ }
   if (!JETONS.includes(etat.jeton)) etat.jeton = 50;
   const depuisAdresse = location.hash.replace("#", "");
-  if ([...JEUX, "classement"].includes(depuisAdresse)) etat.onglet = depuisAdresse;
-  const ongletChoisi = [...JEUX, "classement"].includes(depuisAdresse);
+  const ONGLETS = [...JEUX, "classement", "admin"];
+  if (ONGLETS.includes(depuisAdresse)) etat.onglet = depuisAdresse;
+  const ongletChoisi = ONGLETS.includes(depuisAdresse);
 
   const maintenant = () => Date.now() + etat.decalage;
   const estAdmin = () => !!(etat.profil && etat.profil.admin);
@@ -311,11 +312,16 @@
   async function chargerDons() {
     const r = await sb.from("kz_dons").select("id, de_pseudo, montant, cree_le").eq("type", "tip").order("id", { ascending: false }).limit(6);
     if (!r.error) etat.tips = r.data || [];
+    if (estAdmin()) await chargerGives();
+  }
+  async function chargerGives() {
+    const g = await sb.from("kz_dons").select("id, de_pseudo, a_pseudo, montant, source, cree_le").eq("type", "give").order("id", { ascending: false }).limit(8);
+    if (!g.error) etat.gives = g.data || [];
   }
   function rendreCroupier() {
     const el = $("croupier");
     if (!el) return;
-    el.hidden = STREAM || etat.onglet === "classement";
+    el.hidden = STREAM || !JEUX.includes(etat.onglet);
     $("tips").innerHTML = etat.session
       ? [50, 100, 500].map((v) => `<button class="bk-btn bk-btn-ligne bk-btn-petit" type="button" data-action="tip" data-montant="${v}">Tip ${nombre(v)} c</button>`).join("")
       : `<button class="bk-btn bk-btn-twitch bk-btn-petit" data-action="connexion">Se connecter pour tiper</button>`;
@@ -323,7 +329,10 @@
     $("derniers-tips").innerHTML = t.length
       ? t.map((x) => `<li><b>${echap(x.de_pseudo || "Quelqu'un")}</b> · ${nombre(x.montant)} c</li>`).join("")
       : `<li class="bk-discret">Pas encore de pourboire ce soir.</li>`;
-    $("admin-don").hidden = STREAM || !estAdmin() || etat.onglet === "classement";
+    const g = etat.gives || [];
+    $("admin-gives").innerHTML = g.length
+      ? g.map((x) => `<li><b>${echap(x.a_pseudo)}</b> · +${nombre(x.montant)} c <span class="bk-discret">(${x.source === "chat" ? "chat, par " + echap(x.de_pseudo || "?") : "site"})</span></li>`).join("")
+      : `<li class="bk-discret">Aucun give pour l'instant.</li>`;
   }
 
   async function chargerProfil() {
@@ -1106,6 +1115,7 @@
   }
 
   function rendreOnglets() {
+    $("onglet-admin").hidden = STREAM || !estAdmin();
     const enDirect = etat.tour && enCours(etat.tour) ? etat.tour.jeu : null;
     document.querySelectorAll(".bk-onglets [data-onglet]").forEach((b) => {
       b.setAttribute("aria-selected", b.dataset.onglet === etat.onglet ? "true" : "false");
@@ -1124,28 +1134,44 @@
     if (sig === signatureAdmin) return;
     signatureAdmin = sig;
     el.hidden = false;
-    const durees = [60, 90, 180, 0]; if (!durees.includes(k.duree_mises)) durees.push(k.duree_mises);
     const lancer = (t0 => t0 && t0.manuel ? "Fermer les mises · " : "")(tourDuJeu()) + { roulette: "Lancer la bille", crash: "Décoller", course: "Donner le départ" }[j];
     let actions = "";
-    if (k.ouvert && ["attente", "annule", "resultat"].includes(ph)) actions = `<button class="bk-btn bk-btn-plein" type="button" data-action="admin-tour">Ouvrir les mises · ${NOM_JEU[j]}</button>`;
+    if (!k.ouvert) actions = `<button class="bk-btn bk-btn-plein" type="button" data-action="admin-ouvrir">Ouvrir les jeux</button>`;
+    else if (["attente", "annule", "resultat"].includes(ph)) actions = `<button class="bk-btn bk-btn-plein" type="button" data-action="admin-tour">Ouvrir les mises · ${NOM_JEU[j]}</button>`;
     else if (ph === "mises") actions = `<button class="bk-btn bk-btn-plein" type="button" data-action="admin-tirer">${lancer}</button>
         <button class="bk-btn bk-btn-danger" type="button" data-action="admin-annuler">${etat.confirmerAnnulation ? "Confirmer : rendre toutes les mises" : "Annuler le tour"}</button>`;
+    el.hidden = !actions;
+    el.innerHTML = actions;
+  }
+
+  // l'onglet Admin : les réglages des jeux (le give est dans le même onglet)
+  let signatureReglages = "";
+  function rendreReglages() {
+    const el = $("admin-reglages");
+    const k = etat.kz;
+    if (!k) { el.innerHTML = `<p class="bk-discret">Chargement…</p>`; signatureReglages = ""; return; }
+    const sig = [k.ouvert, k.auto, k.duree_mises, etat.enchainer].join("|");
+    if (sig === signatureReglages) return;
+    signatureReglages = sig;
+    const durees = [60, 90, 180, 0]; if (!durees.includes(k.duree_mises)) durees.push(k.duree_mises);
     el.innerHTML = `
-      <span class="kz-etiquette">Admin</span>
-      <label><input type="checkbox" data-admin="ouvert" ${k.ouvert ? "checked" : ""}> Jeux ouverts</label>
-      <label title="Ouvre et ferme les jeux tout seuls au début et à la fin de ton live"><input type="checkbox" data-admin="auto" ${k.auto ? "checked" : ""}> Suit le live</label>
-      <label>Mises <select data-admin="duree">${durees.sort((a, b) => (a || 1e9) - (b || 1e9)).map((d) => `<option value="${d}" ${d === k.duree_mises ? "selected" : ""}>${dureeTexte(d)}</option>`).join("")}</select></label>
-      <label title="Rouvre les mises du même jeu ${ENCHAINER_APRES_MS / 1000} s après chaque résultat"><input type="checkbox" data-admin="enchainer" ${etat.enchainer ? "checked" : ""}> Enchaîner</label>
-      ${actions}`;
+      <label><input type="checkbox" data-admin="ouvert" ${k.ouvert ? "checked" : ""}> <span><b>Jeux ouverts</b><small>Fermer rembourse le tour en cours.</small></span></label>
+      <label><input type="checkbox" data-admin="auto" ${k.auto ? "checked" : ""}> <span><b>Suit le live</b><small>Ouvre et ferme les jeux tout seuls au début et à la fin de ton live.</small></span></label>
+      <label><input type="checkbox" data-admin="enchainer" ${etat.enchainer ? "checked" : ""}> <span><b>Enchaîner</b><small>Rouvre les mises du même jeu ${ENCHAINER_APRES_MS / 1000} s après chaque résultat (tant que cette page est ouverte).</small></span></label>
+      <label class="kz-reglage-duree"><span><b>Temps pour miser</b></span> <select data-admin="duree">${durees.sort((a, b) => (a || 1e9) - (b || 1e9)).map((d) => `<option value="${d}" ${d === k.duree_mises ? "selected" : ""}>${dureeTexte(d)}</option>`).join("")}</select></label>`;
   }
 
   function rendreJeu() {
     const j = jeuAffiche();
     const ph = phase();
     const ferme = ph === "ferme" || ph === "absent";
-    const classement = !STREAM && etat.onglet === "classement";
+    if (etat.onglet === "admin" && etat.premierChargement && !estAdmin()) etat.onglet = "roulette";
+    const vueAdmin = !STREAM && etat.onglet === "admin" && estAdmin();
+    const classement = !STREAM && (etat.onglet === "classement" || vueAdmin);
     document.querySelectorAll(".kz-vue-jeu").forEach((el) => { el.hidden = classement; });
-    $("vue-classement").hidden = !classement;
+    $("vue-classement").hidden = !classement || vueAdmin;
+    $("vue-admin").hidden = !vueAdmin;
+    if (vueAdmin) { $("ferme").hidden = true; document.querySelectorAll(".kz-jeu").forEach((el) => { el.hidden = true; }); $("rack").hidden = true; rendreReglages(); rendreCroupier(); if (!etat.gives) { etat.gives = []; chargerGives().then(rendreCroupier).catch(() => {}); } return; }
     $("ferme").hidden = classement || !ferme;
     document.querySelectorAll(".kz-jeu").forEach((el) => { el.hidden = classement || ferme || el.dataset.jeu !== j; });
     $("rack").hidden = classement || ferme || ph === "ailleurs";
@@ -1280,7 +1306,7 @@
     try { await Promise.all([chargerEtat(), chargerTour()]); } catch (e) { /* rien */ }
     rendreTout();
   }
-  $("admin").addEventListener("change", (ev) => {
+  $("admin-reglages").addEventListener("change", (ev) => {
     const c = ev.target.dataset.admin;
     if (c === "ouvert") admin(() => appel("kz_ouvrir", { p_ouvert: ev.target.checked }), ev.target.checked ? "Jeux ouverts." : "Jeux fermés, le tour en cours est remboursé.");
     if (c === "auto") admin(() => appel("kz_regler", { p_auto: ev.target.checked }));
@@ -1288,7 +1314,7 @@
     if (c === "enchainer") {
       etat.enchainer = ev.target.checked;
       try { localStorage.setItem("kz-enchainer", etat.enchainer ? "1" : "0"); } catch (e) { /* rien */ }
-      signatureAdmin = ""; rendreStatut();
+      signatureAdmin = ""; signatureReglages = ""; rendreStatut(); rendreJeu();
     }
   });
 
@@ -1349,6 +1375,7 @@
       }
       case "crash-encaisser": encaisser(b); break;
       case "crash-reprendre": if (peutMiser()) reprendre("crash"); break;
+      case "admin-ouvrir": admin(() => appel("kz_ouvrir", { p_ouvert: true }), "Jeux ouverts."); break;
       case "admin-tour": admin(() => appel("kz_nouveau_tour", { p_jeu: jeuAffiche(), p_duree: etat.kz.duree_mises })); break;
       case "admin-tirer": admin(() => appel("kz_tirer", { p_tour: etat.tour.id })); break;
       case "admin-annuler":
@@ -1368,6 +1395,7 @@
         const r = await appel("kz_donner", { p_nom: nom, p_montant: montant });
         annoncer(`${nombre(r.montant)} centimes donnés à ${r.pseudo}.`, "ok");
         $("don-nom").value = "";
+        chargerGives().then(rendreCroupier).catch(() => {});
         chargerClassement().then(() => rendreClassement && rendreClassement()).catch(() => {});
       } catch (e) { annoncer(messageErreur(e), "erreur"); }
     });
