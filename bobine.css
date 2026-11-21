@@ -342,3 +342,46 @@ body.lecture #sheet-body button:not(.x),body.lecture #sheet-body form,body.lectu
 body.lecture .ticket{cursor:default}
 .credits .liens{margin-left:auto}
 #cpt-body a{color:var(--ink)}
+
+/* ===== 1.5 : forum, équipe, admin ===== */
+.pastille{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:99px;background:var(--accent);color:var(--on-accent,#fff);font:700 11px/1 var(--mono);vertical-align:middle}
+.fz-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.fz-actions a{text-decoration:none;display:inline-flex;align-items:center}
+.fz-actions a.ghost{color:var(--ink)}
+.fz-liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.fz-sujet{display:flex;flex-direction:column;gap:4px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink)}
+.fz-sujet:hover{border-color:var(--ink)}
+.fz-sujet.masque{opacity:.55}
+.fz-titre{font-weight:700;font-size:16px}
+.fz-meta{font-size:13px;color:var(--muted)}
+.fz-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0}
+.cat{font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;padding:4px 7px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
+.cat-idee{color:#2f8f5b}.cat-bug{color:var(--accent)}.cat-discussion{color:#3d6fd6}
+.tag.danger{color:var(--accent);border-color:var(--accent)}
+.fz-retour{margin:0 0 6px}.fz-retour a{color:var(--muted);text-decoration:none;font-weight:600}
+.fz-tete h2{font-size:clamp(24px,6vw,34px)}
+.fz-adm{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.msg{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.msg.masque{opacity:.5}
+.av{width:32px;height:32px;border-radius:50%;object-fit:cover;flex:0 0 32px}
+.av.vide{display:grid;place-items:center;background:var(--line);font-weight:700;text-transform:uppercase}
+.msg-corps{flex:1;min-width:0}
+.msg-corps p{margin:4px 0;overflow-wrap:anywhere}
+.msg-tete{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.quand{font:500 12px/1 var(--mono);color:var(--muted)}
+.badge-eq{font:700 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--bulb);background:#111216;padding:3px 6px;border-radius:4px;margin-left:6px}
+.msg-act{display:flex;gap:12px;flex-wrap:wrap}
+.lien{background:none;border:0;padding:0;color:var(--muted);font:600 12px/1.4 var(--body);cursor:pointer}
+.lien:hover{color:var(--ink);text-decoration:underline}
+.lien.danger{color:var(--accent)}
+.fz-sig{display:flex;gap:8px;width:100%}
+.fz-sig input{flex:1;min-width:0}
+.fz-form{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+.bulles{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.bulle{max-width:85%;align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px 12px 12px 4px;padding:8px 12px}
+.bulle.moi{align-self:flex-end;background:var(--ink);color:var(--bg);border-color:var(--ink);border-radius:12px 12px 4px 12px}
+.bulle.moi .quand{color:inherit;opacity:.7}
+.bulle p{margin:0 0 4px;overflow-wrap:anywhere}
+.sign{border-top:1px solid var(--line);padding:10px 0}
+.sign blockquote{margin:6px 0 10px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--bg);border-radius:4px}
+body[data-vue=forum] .fab,body[data-vue=contact] .fab,body[data-vue=admin] .fab{display:none}

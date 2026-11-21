@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.4';
+var VERSION='1.5';
 var NOUVEAUTES=[
+  ['1.5','Forum pour les idées, les bugs et les discussions, et conversation privée avec l’équipe'],
   ['1.4','Carnets publics avec un lien à partager, carnet privé en un clic, suppression du carnet et page Confidentialité'],
   ['1.3','La date de visionnage devient un bonus, et le temps devant l’écran se compte depuis toujours'],
   ['1.2','Formulaire plus simple, l’année et la durée se remplissent toutes seules'],
@@ -16,7 +17,7 @@ var NOUVEAUTES=[
 /* Lecture du carnet de quelqu'un : bobine.html?carnet=pseudo (rien n'est jamais enregistré dans ce mode) */
 var LECTURE=null;try{LECTURE=(new URLSearchParams(location.search).get('carnet')||'').trim().slice(0,60)||null;}catch(e){}
 var LECTEUR={charge:false,trouve:false,pseudo:LECTURE,avatar:null};
-var ROUTES=[['journal','Journal'],['films','Films'],['a-voir','À voir'],['listes','Listes'],['bilan','Bilan'],['demenager','Déménager'],['manifeste','Manifeste']];
+var ROUTES=[['journal','Journal'],['films','Films'],['a-voir','À voir'],['listes','Listes'],['bilan','Bilan'],['forum','Forum'],['demenager','Déménager'],['manifeste','Manifeste']];
 
 function $(s,r){return (r||document).querySelector(s);}
 function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
@@ -140,7 +141,7 @@ function connect(){
 function changerCompte(id){
   if(!id){
     if(Store.mode==='db'){lsDel('bobine.compte.'+Store.user);Store.mode='local';Store.user=null;Store.profil=null;Store.last=null;S=upgrade(lsGet(LS));render();}
-    setStatus('local');renderCompte();setTimeout(rattraper,1500);return;
+    FZ.notifs={admin:false,contact:0,a_traiter:0};setStatus('local');renderCompte();renderTabs();setTimeout(rattraper,1500);return;
   }
   Store.user=id;Store.mode='db';Store.last=null;setStatus('loading');renderCompte();
   var avant=lsGet('bobine.compte.'+id);if(avant){S=upgrade(avant);render();}
@@ -153,7 +154,7 @@ function changerCompte(id){
     if(local){apport=fusionner(local);lsDel(LS);}
     lsSet();render();renderCompte();setStatus('saved');
     if(apport&&(apport.films||apport.diary||apport.lists)){toast('Ton carnet de cet appareil a rejoint ton compte');commit({norender:true});}
-    setTimeout(rattraper,1500);
+    setTimeout(rattraper,1500);chargerNotifs();
   }).catch(function(e){
     console.warn('Bobine : lecture du compte impossible',e);
     Store.mode='local';Store.user=null;
@@ -279,9 +280,9 @@ function renderDlgCompte(){
     '<div class="fld"><span>Le lien de ton carnet</span><div class="datebox"><input id="cpt-lien" readonly value="'+esc(lienCarnet())+'"><button type="button" class="ghost small" data-action="cptcopie">Copier</button></div>'+
     '<p class="muted petit">'+(reglages.prive?'Ton carnet est privé, ce lien n’affiche rien aux autres.':'Toute personne qui a ce lien peut lire ton carnet. Il n’apparaît nulle part ailleurs.')+'</p></div>'+
     '<label class="tog large"><input type="checkbox" id="cpt-prive"'+(reglages.prive?' checked':'')+'><span>Carnet privé</span></label>'+
-    '<div class="fld"><span>Tes données</span><p class="muted petit"><a href="#demenager" data-action="close">Exporter tout ton carnet</a><br><a href="#confidentialite" data-action="close">Confidentialité</a></p></div>'+
+    '<div class="fld"><span>Tes données</span><p class="muted petit"><a href="#contact" data-action="close">Écrire à l’équipe</a><br><a href="#demenager" data-action="close">Exporter tout ton carnet</a><br><a href="#confidentialite" data-action="close">Confidentialité</a></p></div>'+
     (confirmSuppr===0?'<button type="button" class="ghost danger" data-action="cptsuppr">Supprimer mon carnet</button>':
-     '<div class="confirm">'+(confirmSuppr===1?'Tout ton carnet sera effacé, films, séances, critiques et listes. Ton compte Twitch et tes centimes Kawaze Games ne bougent pas.':'Dernière confirmation, ça ne se rattrape pas.')+
+     '<div class="confirm">'+(confirmSuppr===1?'Tout ton carnet sera effacé, films, séances, critiques et listes, ainsi que tes messages du forum et ta conversation avec l’équipe. Ton compte Twitch et tes centimes Kawaze Games ne bougent pas.':'Dernière confirmation, ça ne se rattrape pas.')+
      ' <button type="button" class="primary small" data-action="cptsuppr">'+(confirmSuppr===1?'Continuer':'Oui, tout effacer')+'</button> <button type="button" class="ghost small" data-action="cptnon">Non</button></div>')+
     '<div class="df"><button type="button" class="ghost" data-action="logout">Déconnexion</button><span class="sp"></span><button type="button" class="primary" data-action="close">Fermer</button></div>';
 }
@@ -315,11 +316,199 @@ function chargerLecture(){
   },function(){LECTEUR.charge=true;render();});
 }
 
+/* ---------- Forum, conversation avec l'équipe, espace admin ----------
+   Tout passe par des fonctions Supabase qui vérifient qui écrit. Pas de messages privés entre membres. */
+var CATS={idee:'Idée',bug:'Bug',discussion:'Discussion'};
+var FZ={liste:null,filtre:'tous',sujet:null,contact:null,notifs:{admin:false,contact:0,a_traiter:0},adm:{conv:null,une:null,sign:null},envoi:false};
+function connecte(){return !!(sb&&Store.mode==='db'&&Store.user);}
+function routeParam(){var p=location.hash.slice(1).split('/');return p[1]?decodeURIComponent(p[1]):'';}
+function quand(iso){
+  var d=new Date(iso),s=(Date.now()-d.getTime())/1000;
+  if(s<60)return 'à l’instant';if(s<3600)return 'il y a '+Math.floor(s/60)+' min';if(s<86400)return 'il y a '+Math.floor(s/3600)+' h';
+  if(s<86400*7)return 'il y a '+plural(Math.floor(s/86400),'jour','jours');
+  return d.getDate()+' '+MOIS[d.getMonth()]+(d.getFullYear()!==new Date().getFullYear()?' '+d.getFullYear():'');
+}
+function texteMsg(t){return esc(t).replace(/\n/g,'<br>');}
+function erreurRpc(e){return (e&&e.message?String(e.message):'Ça n’a pas marché, réessaie.').replace(/^(psql:\S+\s*)?ERROR:\s*/,'').split(/\s*CONTEXT:/)[0].trim();}
+function appel(nom,args){
+  if(!sb)return Promise.reject({message:'Le forum a besoin de la connexion au site.'});
+  return timeout(sb.rpc(nom,args||{}),15000).then(function(r){if(r.error)throw r.error;return r.data;});
+}
+function avatarDe(a){return a&&a.avatar?'<img class="av" src="'+esc(a.avatar)+'" alt="" width="32" height="32" loading="lazy">':'<span class="av vide">'+esc(((a&&a.pseudo)||'?').charAt(0))+'</span>';}
+function nomDe(a){return '<b>'+esc((a&&a.pseudo)||'Membre')+'</b>'+(a&&a.admin?'<span class="badge-eq">équipe</span>':'');}
+function pastille(n){return n?'<span class="pastille" aria-label="'+n+' à lire">'+n+'</span>':'';}
+
+/* Pastilles de non-lus (onglets Forum et Admin) */
+var notifT=null;
+function chargerNotifs(){
+  clearTimeout(notifT);
+  if(!sb||LECTURE)return;
+  timeout(sb.rpc('bobine_notifs'),10000).then(function(r){
+    if(r.error)return;
+    var n=r.data||{},avant=JSON.stringify(FZ.notifs),etaitAdmin=FZ.notifs.admin;FZ.notifs={admin:!!n.admin,contact:n.contact||0,a_traiter:n.a_traiter||0};
+    if(FZ.notifs.admin!==etaitAdmin&&/^#admin/.test(location.hash))render();
+    else if(JSON.stringify(FZ.notifs)!==avant)renderTabs();
+  },function(){}).then(function(){notifT=setTimeout(chargerNotifs,60000);});
+}
+
+/* ---- Vues ---- */
+function vueForum(){
+  var p=routeParam();
+  if(p==='nouveau')return vueNouveauSujet();
+  if(p)return '<div id="fz"><p class="muted">Chargement du sujet…</p></div>';
+  var chip=function(id,l){return '<button type="button" data-action="fzfiltre" data-v="'+id+'" aria-pressed="'+(FZ.filtre===id)+'">'+l+'</button>';};
+  return '<div class="viewhead"><h2>Forum</h2><p class="sub">idées, bugs et discussions</p></div>'+
+    '<div class="btnrow fz-actions">'+(connecte()?'<a class="primary" href="#forum/nouveau">Ouvrir un sujet</a><a class="ghost" href="#contact">Écrire à l’équipe'+pastille(FZ.notifs.contact)+'</a>':'<button class="primary" type="button" data-action="login">Se connecter pour écrire</button>')+'</div>'+
+    '<div class="chips">'+chip('tous','Tous')+chip('idee','Idées')+chip('bug','Bugs')+chip('discussion','Discussions')+'</div>'+
+    '<div id="fz"><p class="muted">Chargement du forum…</p></div>';
+}
+function remplirForum(){
+  var el=$('#fz');if(!el)return;
+  var l=(FZ.liste||[]).filter(function(s){return FZ.filtre==='tous'||s.categorie===FZ.filtre;});
+  if(!l.length){el.innerHTML='<div class="card-box"><h3>Rien pour l’instant</h3><p>Sois le premier à lancer un sujet.</p></div>';return;}
+  el.innerHTML='<ul class="fz-liste">'+l.map(function(s){
+    return '<li><a href="#forum/'+s.id+'" class="fz-sujet'+(s.masque?' masque':'')+'">'+
+      '<span class="fz-tags"><span class="cat cat-'+s.categorie+'">'+CATS[s.categorie]+'</span>'+(s.epingle?'<span class="tag">épinglé</span>':'')+(s.verrouille?'<span class="tag">fermé</span>':'')+(s.masque?'<span class="tag danger">masqué</span>':'')+'</span>'+
+      '<span class="fz-titre">'+esc(s.titre)+'</span>'+
+      '<span class="fz-meta">'+esc(s.auteur.pseudo)+', '+quand(s.activite_le)+', '+plural(s.reponses,'réponse','réponses')+'</span></a></li>';
+  }).join('')+'</ul>';
+}
+function remplirSujet(){
+  var el=$('#fz'),s=FZ.sujet;if(!el)return;
+  if(!s||!s.trouve){el.innerHTML='<p><a href="#forum">← Forum</a></p><div class="card-box"><h3>Sujet introuvable</h3><p>Il a peut-être été supprimé.</p></div>';return;}
+  var adm=FZ.notifs.admin;
+  var h='<p class="fz-retour"><a href="#forum">← Forum</a></p>'+
+    '<div class="viewhead fz-tete"><h2>'+esc(s.titre)+'</h2></div>'+
+    '<p class="fz-tags"><span class="cat cat-'+s.categorie+'">'+CATS[s.categorie]+'</span>'+(s.epingle?'<span class="tag">épinglé</span>':'')+(s.verrouille?'<span class="tag">fermé</span>':'')+(s.masque?'<span class="tag danger">masqué</span>':'')+'</p>';
+  if(adm)h+='<div class="fz-adm">'+
+    '<button class="ghost small" type="button" data-action="fzmod" data-quoi="sujet" data-id="'+s.id+'" data-act="'+(s.epingle?'desepingler':'epingler')+'">'+(s.epingle?'Désépingler':'Épingler')+'</button>'+
+    '<button class="ghost small" type="button" data-action="fzmod" data-quoi="sujet" data-id="'+s.id+'" data-act="'+(s.verrouille?'deverrouiller':'verrouiller')+'">'+(s.verrouille?'Rouvrir':'Fermer le sujet')+'</button>'+
+    '<button class="ghost small danger" type="button" data-action="fzmod" data-quoi="sujet" data-id="'+s.id+'" data-act="'+(s.masque?'afficher':'masquer')+'">'+(s.masque?'Afficher le sujet':'Masquer le sujet')+'</button></div>';
+  h+=s.messages.map(function(m){
+    var act='';
+    if(m.a_moi)act+='<button class="lien" type="button" data-action="fzsuppr" data-id="'+m.id+'">Supprimer</button>';
+    else if(connecte())act+='<button class="lien" type="button" data-action="fzsignal" data-id="'+m.id+'">Signaler</button>';
+    if(adm){
+      act+='<button class="lien" type="button" data-action="fzmod" data-quoi="message" data-id="'+m.id+'" data-act="'+(m.masque?'afficher':'masquer')+'">'+(m.masque?'Afficher':'Masquer')+'</button>';
+      if(!m.a_moi&&m.user_id)act+='<button class="lien danger" type="button" data-action="fzban" data-u="'+esc(m.user_id)+'" data-v="'+(m.banni?'0':'1')+'">'+(m.banni?'Réintégrer':'Exclure du forum')+'</button>';
+      if(!m.a_moi&&!m.masque)act+='<button class="lien danger" type="button" data-action="fzsuppr" data-id="'+m.id+'">Supprimer</button>';
+    }
+    return '<article class="msg'+(m.masque?' masque':'')+'">'+avatarDe(m.auteur)+'<div class="msg-corps"><div class="msg-tete">'+nomDe(m.auteur)+'<span class="quand">'+quand(m.cree_le)+'</span>'+(m.masque?'<span class="tag danger">masqué</span>':'')+'</div>'+
+      '<p>'+texteMsg(m.texte)+'</p><div class="msg-act">'+act+'</div></div></article>';
+  }).join('');
+  if(!connecte())h+='<p class="muted">Connecte-toi avec Twitch pour répondre.</p>';
+  else if(s.verrouille&&!adm)h+='<p class="muted">Ce sujet est fermé.</p>';
+  else h+='<form class="fz-form" id="fz-rep"><label class="fld"><span>Ta réponse</span><textarea name="t" rows="4" maxlength="4000" required></textarea></label><div class="df"><span class="sp"></span><button class="primary" type="submit">Envoyer</button></div></form>';
+  el.innerHTML=h;
+}
+function vueNouveauSujet(){
+  if(!connecte())return '<p><a href="#forum">← Forum</a></p><div class="card-box"><h3>Connecte-toi pour écrire</h3><p>Le forum se lit sans compte, mais il faut se connecter avec Twitch pour ouvrir un sujet.</p><button class="primary" type="button" data-action="login">Se connecter avec Twitch</button></div>';
+  return '<p class="fz-retour"><a href="#forum">← Forum</a></p><div class="viewhead"><h2>Nouveau sujet</h2></div>'+
+    '<form class="fz-form card-box" id="fz-nouveau">'+
+    '<label class="fld"><span>Catégorie</span><select name="c"><option value="idee">Idée</option><option value="bug">Bug</option><option value="discussion">Discussion</option></select></label>'+
+    '<label class="fld"><span>Titre</span><input name="ti" maxlength="120" required autocomplete="off"></label>'+
+    '<label class="fld"><span>Message</span><textarea name="t" rows="6" maxlength="4000" required></textarea></label>'+
+    '<p class="muted petit">Ton message sera public, signé de ton pseudo Twitch.</p>'+
+    '<div class="df"><a class="ghost" href="#forum">Annuler</a><span class="sp"></span><button class="primary" type="submit">Publier</button></div></form>';
+}
+function vueContact(){
+  if(!connecte())return '<div class="viewhead"><h2>Écrire à l’équipe</h2></div><div class="card-box"><p>Connecte-toi avec Twitch pour écrire à l’équipe.</p><button class="primary" type="button" data-action="login">Se connecter avec Twitch</button></div>';
+  return '<p class="fz-retour"><a href="#forum">← Forum</a></p><div class="viewhead"><h2>Écrire à l’équipe</h2></div>'+
+    '<p class="muted">Un bug, une idée, une question sur tes données. Seuls toi et l’équipe lisez cette conversation.</p>'+
+    '<div id="fz"><p class="muted">Chargement…</p></div>'+
+    '<form class="fz-form" id="fz-contact"><label class="fld"><span>Ton message</span><textarea name="t" rows="4" maxlength="4000" required></textarea></label><div class="df"><span class="sp"></span><button class="primary" type="submit">Envoyer</button></div></form>';
+}
+function bulles(msgs,cote){
+  if(!msgs.length)return '<p class="muted">Pas encore de message.</p>';
+  return '<div class="bulles">'+msgs.map(function(m){
+    var moi=cote==='membre'?!m.de_admin:m.de_admin;
+    return '<div class="bulle'+(moi?' moi':'')+'"><p>'+texteMsg(m.texte)+'</p><span class="quand">'+(m.de_admin?'Équipe, ':'')+quand(m.cree_le)+'</span></div>';
+  }).join('')+'</div>';
+}
+function vueAdmin(){
+  if(!FZ.notifs.admin)return '<div class="card-box"><h3>Réservé à l’équipe</h3></div>';
+  var p=routeParam();
+  if(p)return '<p class="fz-retour"><a href="#admin">← Admin</a></p><div id="fz"><p class="muted">Chargement…</p></div>';
+  return '<div class="viewhead"><h2>Admin</h2><p class="sub">visible par toi seul</p></div>'+
+    '<section class="card-box"><h3>Messages privés</h3><div id="fz-conv"><p class="muted">Chargement…</p></div></section>'+
+    '<section class="card-box"><h3>Signalements</h3><div id="fz-sign"><p class="muted">Chargement…</p></div></section>';
+}
+function remplirAdmin(){
+  var c=$('#fz-conv'),g=$('#fz-sign');
+  if(c)c.innerHTML=(FZ.adm.conv||[]).length?'<ul class="fz-liste">'+FZ.adm.conv.map(function(x){
+    return '<li><a class="fz-sujet" href="#admin/'+encodeURIComponent(x.user_id)+'"><span class="fz-titre">'+esc(x.membre.pseudo)+pastille(x.non_lus)+'</span><span class="fz-meta">'+esc(x.apercu||'')+'</span><span class="fz-meta">'+quand(x.dernier_le)+'</span></a></li>';}).join('')+'</ul>':'<p class="muted">Aucun message.</p>';
+  if(g)g.innerHTML=(FZ.adm.sign||[]).length?FZ.adm.sign.map(function(x){
+    return '<div class="sign"><p class="fz-meta">'+esc(x.par.pseudo)+' signale '+esc(x.auteur.pseudo)+' dans <a href="#forum/'+x.sujet_id+'">'+esc(x.sujet||'un sujet')+'</a>, '+quand(x.cree_le)+(x.raison?', « '+esc(x.raison)+' »':'')+'</p>'+
+      '<blockquote>'+texteMsg(x.texte)+'</blockquote><div class="btnrow"><button class="primary small" type="button" data-action="fzmod" data-quoi="message" data-id="'+x.message_id+'" data-act="masquer">Masquer le message</button><button class="ghost small" type="button" data-action="fztraite" data-id="'+x.id+'">Laisser, rien à faire</button></div></div>';}).join(''):'<p class="muted">Rien à traiter.</p>';
+}
+function remplirConvAdmin(){
+  var el=$('#fz'),x=FZ.adm.une;if(!el||!x)return;
+  el.innerHTML='<div class="viewhead"><h2>'+esc(x.membre.pseudo)+'</h2></div>'+
+    '<div class="btnrow"><button class="ghost small danger" type="button" data-action="fzban" data-u="'+esc(routeParam())+'" data-v="'+(x.banni?'0':'1')+'">'+(x.banni?'Réintégrer au forum':'Exclure du forum')+'</button></div>'+
+    bulles(x.messages,'admin')+
+    '<form class="fz-form" id="fz-admrep"><label class="fld"><span>Ta réponse</span><textarea name="t" rows="4" maxlength="4000" required></textarea></label><div class="df"><span class="sp"></span><button class="primary" type="submit">Répondre</button></div></form>';
+}
+
+/* ---- Chargements après l'affichage d'une vue ---- */
+function apresRendu(r){
+  if(r==='forum'){
+    var p=routeParam();
+    if(p==='nouveau')return;
+    if(p){appel('bobine_sujet',{p_id:+p}).then(function(d){FZ.sujet=d;if(route()==='forum'&&routeParam()===p)remplirSujet();},function(e){FZ.sujet=null;remplirSujet();});return;}
+    if(FZ.liste)remplirForum();
+    appel('bobine_forum').then(function(d){FZ.liste=d||[];if(route()==='forum'&&!routeParam())remplirForum();},function(e){var el=$('#fz');if(el)el.innerHTML='<p class="muted">'+esc(erreurRpc(e))+'</p>';});
+  }
+  if(r==='contact'&&connecte()){
+    appel('bobine_contact').then(function(d){FZ.contact=d||[];var el=$('#fz');if(el&&route()==='contact')el.innerHTML=bulles(FZ.contact,'membre');FZ.notifs.contact=0;renderTabs();},function(e){var el=$('#fz');if(el)el.innerHTML='<p class="muted">'+esc(erreurRpc(e))+'</p>';});
+  }
+  if(r==='admin'&&FZ.notifs.admin){
+    var u=routeParam();
+    if(u){appel('bobine_admin_conversation',{p_user:u}).then(function(d){FZ.adm.une=d;remplirConvAdmin();chargerNotifs();});return;}
+    Promise.all([appel('bobine_admin_conversations'),appel('bobine_admin_signalements')]).then(function(d){FZ.adm.conv=d[0]||[];FZ.adm.sign=d[1]||[];if(route()==='admin'&&!routeParam())remplirAdmin();});
+  }
+}
+
+/* ---- Envois ---- */
+function envoyer(form,nom,args,ok){
+  if(FZ.envoi)return;FZ.envoi=true;
+  var b=form.querySelector('button[type=submit]');if(b)b.disabled=true;
+  appel(nom,args).then(function(d){FZ.envoi=false;if(b)b.disabled=false;ok(d);},function(e){FZ.envoi=false;if(b)b.disabled=false;toast(erreurRpc(e));});
+}
+document.addEventListener('submit',function(ev){
+  var f=ev.target;
+  if(f.id==='fz-nouveau'){ev.preventDefault();envoyer(f,'bobine_nouveau_sujet',{p_categorie:f.c.value,p_titre:f.ti.value,p_texte:f.t.value},function(id){FZ.liste=null;toast('Sujet publié');location.hash='#forum/'+id;});}
+  if(f.id==='fz-rep'){ev.preventDefault();envoyer(f,'bobine_repondre',{p_sujet:FZ.sujet.id,p_texte:f.t.value},function(){f.t.value='';FZ.liste=null;apresRendu('forum');});}
+  if(f.id==='fz-contact'){ev.preventDefault();envoyer(f,'bobine_contact_envoyer',{p_texte:f.t.value},function(){f.t.value='';toast('Message envoyé à l’équipe');apresRendu('contact');});}
+  if(f.classList.contains('fz-sig')){ev.preventDefault();envoyer(f,'bobine_signaler',{p_message:+f.dataset.id,p_raison:f.r.value},function(){f.outerHTML='<span class="muted petit">Merci, l’équipe va regarder.</span>';});}
+  if(f.id==='fz-admrep'){ev.preventDefault();envoyer(f,'bobine_admin_repondre',{p_user:routeParam(),p_texte:f.t.value},function(){f.t.value='';apresRendu('admin');});}
+},true);
+function actionForum(act,a){
+  if(act==='fzfiltre'){FZ.filtre=a.dataset.v;document.querySelectorAll('[data-action=fzfiltre]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===FZ.filtre);});remplirForum();}
+  if(act==='fzsuppr'){
+    if(a.dataset.ok!=='1'){a.dataset.ok='1';a.textContent='Sûr ? Re-clique';return;}
+    appel('bobine_supprimer_message',{p_id:+a.dataset.id}).then(function(d){FZ.liste=null;if(d&&d.sujet_supprime){toast('Sujet supprimé');location.hash='#forum';}else{toast('Message supprimé');apresRendu('forum');}},function(e){toast(erreurRpc(e));});
+  }
+  if(act==='fzsignal'){
+    var zone=a.closest('.msg-act');
+    zone.innerHTML='<form class="fz-sig" data-id="'+esc(a.dataset.id)+'"><input name="r" maxlength="300" placeholder="Pourquoi ? (facultatif)" aria-label="Raison du signalement"><button class="ghost small" type="submit">Signaler</button></form>';
+    zone.querySelector('input').focus();
+  }
+  if(act==='fzmod'){
+    appel('bobine_moderer',{p_quoi:a.dataset.quoi,p_id:+a.dataset.id,p_action:a.dataset.act}).then(function(){FZ.liste=null;toast('C’est fait');apresRendu(route());chargerNotifs();},function(e){toast(erreurRpc(e));});
+  }
+  if(act==='fztraite'){appel('bobine_admin_traiter',{p_id:+a.dataset.id}).then(function(){apresRendu('admin');chargerNotifs();},function(e){toast(erreurRpc(e));});}
+  if(act==='fzban'){
+    var oui=a.dataset.v==='1';
+    if(oui&&a.dataset.ok!=='1'){a.dataset.ok='1';a.textContent='Sûr ? Re-clique';return;}
+    appel('bobine_bannir',{p_user:a.dataset.u,p_banni:oui}).then(function(){toast(oui?'Exclu du forum':'Réintégré au forum');apresRendu(route());},function(e){toast(erreurRpc(e));});
+  }
+}
+
 /* ---------- Rendu ---------- */
 var journalLimit=60,gridLimit=120,fq='',fsort='recent',ffilter='all',openListId=null,confirmWipe=false,listConfirm=false,importReport='';
 
-function route(){var h=location.hash.slice(1);if(h==='confidentialite')return h;if(LECTURE&&h==='demenager')return 'journal';return ROUTES.some(function(r){return r[0]===h;})?h:'journal';}
-function renderTabs(){var r=route();$('#tabs').innerHTML=ROUTES.filter(function(x){return !(LECTURE&&x[0]==='demenager');}).map(function(x){return '<li><a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+x[1]+'</a></li>';}).join('');}
+function route(){var h=location.hash.slice(1).split('/')[0];if(h==='confidentialite')return h;if(LECTURE&&(h==='demenager'||h==='forum'||h==='contact'||h==='admin'))return 'journal';if(h==='contact'||(h==='admin'&&FZ.notifs.admin))return h;return ROUTES.some(function(r){return r[0]===h;})?h:'journal';}
+function renderTabs(){var r=route(),onglets=ROUTES.filter(function(x){return !(LECTURE&&(x[0]==='demenager'||x[0]==='forum'));});if(!LECTURE&&FZ.notifs.admin)onglets=onglets.concat([['admin','Admin']]);$('#tabs').innerHTML=onglets.map(function(x){return '<li><a href="#'+x[0]+'"'+(x[0]===r||(x[0]==='forum'&&r==='contact')?' aria-current="page"':'')+'>'+x[1]+(x[0]==='forum'?pastille(FZ.notifs.contact):x[0]==='admin'?pastille(FZ.notifs.a_traiter):'')+'</a></li>';}).join('');}
 function renderAffiche(){
   var films=Object.values(S.films).filter(function(f){return f.w;}).length;
   var rv=S.diary.filter(function(e){return e.rv;}).length;
@@ -344,7 +533,7 @@ function parseDur(s){
 }
 function render(){
   renderTabs();renderAffiche();
-  var r=route(),v=$('#view');
+  var r=route(),v=$('#view');document.body.dataset.vue=r;
   if(LECTURE&&r!=='manifeste'&&r!=='confidentialite'){
     var tete='<div class="lecture-tete">'+(LECTEUR.avatar?'<img src="'+esc(LECTEUR.avatar)+'" alt="" width="36" height="36">':'')+'<div><span class="sub">Carnet de</span><b>'+esc(LECTEUR.pseudo||'')+'</b></div><a class="ghost small" href="bobine.html">Ouvrir mon carnet</a></div>';
     if(!LECTEUR.charge){v.innerHTML=tete+'<p class="muted">Chargement du carnet…</p>';return;}
@@ -357,6 +546,7 @@ function render(){
   if(r==='films')fillGrid();
   if(r==='demenager')wireDrop();
   updateDatalist();
+  apresRendu(r);
 }
 function poster(f,cls){
   var c=PAL[hash(f.k||f.t||'')%PAL.length],L=(f.t||'').length;
@@ -506,6 +696,7 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Connexion avec Twitch, carnet enregistré sur ton compte</span></div>'+
   '<div><span class="st ok">Fait</span><span>Vraies affiches, durées et réalisateurs grâce à TMDB</span></div>'+
   '<div><span class="st ok">Fait</span><span>Carnets publics avec un lien, carnet privé en un clic</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Forum et conversation privée avec l’équipe</span></div>'+
   '<div><span class="st">Ensuite</span><span>Mode salle obscure, ticket qui se détache, spoilers floutés</span></div>'+
   '<div><span class="st">Ensuite</span><span>Bilan en story, défis et succès, roulette À voir</span></div>'+
   '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
@@ -514,14 +705,17 @@ manifeste:function(){
   NOUVEAUTES.map(function(n){return '<div><span class="st ok">v'+n[0]+'</span><span>'+esc(n[1])+'</span></div>';}).join('')+
   '</div></section></article>';
 },
+forum:function(){return vueForum();},
+contact:function(){return vueContact();},
+admin:function(){return vueAdmin();},
 confidentialite:function(){
   return '<article class="manifesto"><div class="viewhead"><h2>Confidentialité</h2></div>'+
   '<p class="lead">Bobine garde le strict nécessaire, et tu peux tout reprendre ou tout effacer quand tu veux.</p>'+
-  '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, écris à Kawaze en message privé sur Twitch.</p></section>'+
-  '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
+  '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, utilise Écrire à l’équipe, depuis le Forum.</p></section>'+
+  '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Tes messages sur le forum, publics et signés de ton pseudo, et ta conversation avec l’équipe, que seuls toi et l’équipe lisez. Il n’y a pas de messages privés entre membres.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
   '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Ton carnet est public, mais seulement pour qui a son lien. Il n’y a pas d’annuaire des membres, pas de recherche de profils et pas de référencement sur Google.</p><p>Tu peux le passer en privé à tout moment depuis ton compte. Un carnet privé n’est plus visible par personne d’autre que toi.</p></section>'+
-  '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
-  '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement, depuis ton compte. Pour effacer aussi ton compte Twitch relié, écris à Kawaze.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
+  '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base, sur des serveurs en Irlande, dans l’Union européenne. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
+  '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement depuis ton compte, ce qui efface aussi tes messages du forum et ta conversation avec l’équipe. Pour effacer aussi ton compte Twitch relié, écris à l’équipe.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
   '</article>';
 }
 };
@@ -986,6 +1180,7 @@ document.addEventListener('click',function(ev){
     case 'login':seConnecter();break;
     case 'logout':closeDialog($('#compte-dlg'));seDeconnecter();break;
     case 'compte':case 'cptcopie':case 'cptsuppr':case 'cptnon':actionCompte(act);break;
+    case 'fzfiltre':case 'fzsuppr':case 'fzsignal':case 'fzmod':case 'fztraite':case 'fzban':actionForum(act,a);break;
   }
 });
 window.addEventListener('beforeunload',function(ev){if(Store.mode==='db'&&(Store.saving||$('#sync').dataset.s==='pending')){flush();ev.preventDefault();ev.returnValue='';}});
