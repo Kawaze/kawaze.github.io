@@ -291,3 +291,23 @@ dialog::backdrop{background:rgba(5,5,8,.6)}
 .cbtn:hover{border-color:var(--bulb)}
 .invite{font-size:14px;color:var(--muted);border-left:3px solid #9146ff;padding:4px 0 4px 10px;margin:-8px 0 20px!important}
 @media (max-width:420px){.mq-top>span:first-child{display:none}.mq-top{justify-content:flex-end}}
+
+/* ===== TMDB : vraies affiches, suggestions, crédits ===== */
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;border-radius:inherit}
+.poster.has-img::before{display:none}
+.sheet-top .dr{display:block;margin-top:4px;color:var(--muted);font-size:14px}
+.fld-sug{position:relative}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.25);max-height:min(360px,50vh);overflow:auto;padding:4px}
+.sug .si{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:6px;color:var(--ink);font:inherit;cursor:pointer}
+.sug .si:hover,.sug .si.on{background:var(--bg)}
+.sug img,.sug .noimg{width:34px;height:51px;border-radius:4px;object-fit:cover;flex:0 0 34px;background:var(--line)}
+.sug .st{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.sug .st b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.sug .st .fy{font:500 12px/1 var(--mono);color:var(--muted)}
+.sug small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sug small.dt{color:var(--accent);font-weight:600}
+.sug .sl{margin:6px 8px;font:500 12px/1 var(--mono);color:var(--muted)}
+.credits{display:flex;align-items:center;gap:12px;margin-top:28px;padding-top:16px;padding-bottom:24px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.45}
+.credits p{margin:0}
+.credits a{color:inherit}
+.credits img{display:block;width:28px;height:28px}

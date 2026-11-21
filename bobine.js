@@ -55,7 +55,7 @@ function commit(opts){
 }
 
 /* Ce qui est comparé pour savoir si un élément a changé */
-function sigFilm(f){return JSON.stringify([f.t,f.y,f.r||null,!!f.l,!!f.w,f.wl||null,f.m||null]);}
+function sigFilm(f){return JSON.stringify([f.t,f.y,f.r||null,!!f.l,!!f.w,f.wl||null,f.m||null,f.tm==null?null:f.tm,f.p||null,f.dr||null]);}
 function sigSeance(e){return JSON.stringify([e.k,e.d||'',e.r||null,!!e.l,!!e.rw,e.rv||'',e.tg||'',e.u||'']);}
 function sigListe(l,i){return JSON.stringify([l.n,l.ds||'',l.items,i]);}
 function photo(){
@@ -67,7 +67,7 @@ function photo(){
 }
 function differences(){
   var L=Store.last,c={films:[],films_suppr:[],seances:[],seances_suppr:[],listes:[],listes_suppr:[]};
-  Object.keys(S.films).forEach(function(k){var f=S.films[k];if(L.films[k]!==sigFilm(f))c.films.push({k:k,t:f.t,y:f.y,r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null});});
+  Object.keys(S.films).forEach(function(k){var f=S.films[k];if(L.films[k]!==sigFilm(f))c.films.push({k:k,t:f.t,y:f.y,r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null,tm:f.tm==null?null:f.tm,p:f.p||null,dr:f.dr||null});});
   Object.keys(L.films).forEach(function(k){if(!S.films[k])c.films_suppr.push(k);});
   var ids={};
   S.diary.forEach(function(e){ids[e.id]=1;if(L.diary[e.id]!==sigSeance(e))c.seances.push({id:e.id,k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||null});});
@@ -110,7 +110,7 @@ function differences_non_vides(){var c=differences();return c.films.length+c.fil
 /* Ajoute à S tout ce qui manque, sans écraser ce qui existe (carnet local, ou JSON d'un autre appareil) */
 function fusionner(x){
   x=upgrade(x);var c={films:0,diary:0,lists:0};
-  Object.keys(x.films).forEach(function(k){var f=x.films[k];if(!f||!f.t)return;if(!S.films[k]){S.films[k]={k:k,t:String(f.t),y:String(f.y||''),r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null};c.films++;}});
+  Object.keys(x.films).forEach(function(k){var f=x.films[k];if(!f||!f.t)return;if(!S.films[k]){S.films[k]={k:k,t:String(f.t),y:String(f.y||''),r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null,tm:f.tm==null?null:f.tm,p:f.p||null,dr:f.dr||null};c.films++;}});
   var ids={},lieu={};S.diary.forEach(function(e){ids[e.id]=1;lieu[e.k+'#'+e.d]=1;});
   x.diary.forEach(function(e){if(!e||!e.k||!S.films[e.k]||ids[e.id]||lieu[e.k+'#'+(e.d||'')]&&!e.rv)return;S.diary.push({id:e.id||uid(),k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||Date.now()});ids[e.id]=1;c.diary++;});
   x.lists.forEach(function(l){if(!l||!l.n)return;var ex=S.lists.find(function(y){return y.id===l.id||y.n===l.n;});var items=(l.items||[]).filter(function(k){return S.films[k];});if(ex){items.forEach(function(k){if(ex.items.indexOf(k)<0)ex.items.push(k);});}else{S.lists.push({id:l.id||uid(),n:String(l.n),ds:l.ds||'',items:items});c.lists++;}});
@@ -128,7 +128,7 @@ function connect(){
 function changerCompte(id){
   if(!id){
     if(Store.mode==='db'){lsDel('bobine.compte.'+Store.user);Store.mode='local';Store.user=null;Store.profil=null;Store.last=null;S=upgrade(lsGet(LS));render();}
-    setStatus('local');renderCompte();return;
+    setStatus('local');renderCompte();setTimeout(rattraper,1500);return;
   }
   Store.user=id;Store.mode='db';Store.last=null;setStatus('loading');renderCompte();
   var avant=lsGet('bobine.compte.'+id);if(avant){S=upgrade(avant);render();}
@@ -141,6 +141,7 @@ function changerCompte(id){
     if(local){apport=fusionner(local);lsDel(LS);}
     lsSet();render();renderCompte();setStatus('saved');
     if(apport&&(apport.films||apport.diary||apport.lists)){toast('Ton carnet de cet appareil a rejoint ton compte');commit({norender:true});}
+    setTimeout(rattraper,1500);
   }).catch(function(e){
     console.warn('Bobine : lecture du compte impossible',e);
     Store.mode='local';Store.user=null;
@@ -160,6 +161,94 @@ function renderCompte(){
   }else{
     el.innerHTML='<button type="button" class="cbtn twitch" data-action="login">Se connecter avec Twitch</button>';
   }
+}
+
+/* ---------- TMDB : recherche, affiches, durées ----------
+   Tout passe par la fonction Supabase bobine-tmdb : le jeton TMDB n'est jamais dans la page. */
+var TMDB_FN=CFG.url?CFG.url.replace(/\/$/,'')+'/functions/v1/bobine-tmdb':null;
+var IMG='https://image.tmdb.org/t/p/';
+var AFF={}; /* affiches chargées pour l'image de story */
+function tmdbGet(params){return timeout(fetch(TMDB_FN+'?'+new URLSearchParams(params),{headers:{apikey:CFG.cle||''}}).then(function(r){return r.json();}),12000);}
+function chargerAffiche(f){
+  if(!f||!f.p||AFF[f.p])return Promise.resolve();
+  return timeout(new Promise(function(ok){var im=new Image();im.crossOrigin='anonymous';im.onload=function(){AFF[f.p]=im;ok();};im.onerror=function(){ok();};im.src=IMG+'w780'+f.p;}),5000).catch(function(){});
+}
+/* Rattrapage : retrouve sur TMDB les films importés (affiche, durée, réalisateur), 20 par 20, en tâche de fond */
+var ratt=false;
+function rattraper(){
+  if(!TMDB_FN||ratt)return;
+  var liste=Object.values(S.films).filter(function(f){return f.tm==null&&f.t;});
+  if(!liste.length)return;
+  ratt=true;var i=0,ajoutes=0,gros=liste.length>15;
+  if(gros)toast('Recherche des affiches pour '+plural(liste.length,'film','films')+'…');
+  (function suivant(){
+    var lot=liste.slice(i,i+20);i+=20;
+    if(!lot.length){ratt=false;commit();if(gros)toast(plural(ajoutes,'affiche ajoutée','affiches ajoutées')+' depuis TMDB');return;}
+    timeout(fetch(TMDB_FN,{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.cle||''},body:JSON.stringify({films:lot.map(function(f){return {k:f.k,t:f.t,y:f.y};})})}).then(function(r){return r.json();}),30000)
+    .then(function(d){
+      (d.films||[]).forEach(function(r){
+        var f=S.films[r.k];if(!f||r.id===null||r.id===undefined)return;
+        f.tm=r.id||0;
+        if(r.id){if(r.p)f.p=r.p;if(r.dr)f.dr=r.dr;if(!f.m&&r.m)f.m=r.m;ajoutes++;}
+      });
+      commit({norender:i%100!==0});
+      setTimeout(suivant,300);
+    },function(e){console.warn('Bobine : TMDB indisponible',e);ratt=false;commit();});
+  })();
+}
+/* Suggestions pendant la frappe dans « Noter un film » */
+var sugTimer=null,sugSeq=0,sugItems=[],sugIdx=-1;
+function fermerSug(){clearTimeout(sugTimer);sugSeq++;var b=$('#lf-sug');if(b){b.hidden=true;b.innerHTML='';}sugItems=[];sugIdx=-1;}
+function afficherSug(items,enCours){
+  var b=$('#lf-sug');sugItems=items;sugIdx=-1;
+  b.innerHTML=items.map(function(it,i){
+    return '<button type="button" class="si" role="option" data-i="'+i+'">'+(it.p?'<img src="'+IMG+'w92'+esc(it.p)+'" alt="" loading="lazy">':'<span class="noimg"></span>')+
+      '<span class="st"><b>'+esc(it.t)+'</b> <span class="fy">'+esc(it.y||'')+'</span>'+(it.local?'<small class="dt">dans ton carnet</small>':it.to?'<small>'+esc(it.to)+'</small>':'')+'</span></button>';
+  }).join('')+(enCours?'<p class="sl">Recherche…</p>':'');
+  b.hidden=!items.length&&!enCours;
+}
+function chercherSug(q){
+  var seq=++sugSeq,nq=norm(q);
+  var locaux=Object.values(S.films).filter(function(f){return norm(f.t).indexOf(nq)>=0;}).slice(0,3)
+    .map(function(f){return {local:true,k:f.k,t:f.t,y:f.y,p:f.p,tm:f.tm};});
+  afficherSug(locaux,true);
+  tmdbGet({q:q}).then(function(d){
+    if(seq!==sugSeq)return;
+    var dist=(d.resultats||[]).filter(function(r){return !locaux.some(function(l){return l.tm===r.id||(norm(l.t)===norm(r.t)&&l.y===r.y);});}).slice(0,6);
+    afficherSug(locaux.concat(dist.map(function(r){return {tm:r.id,t:r.t,y:r.y,p:r.p,to:r.to};})),false);
+  },function(){if(seq===sugSeq)afficherSug(locaux,false);});
+}
+function choisirSug(i){
+  var it=sugItems[i];if(!it)return;fermerSug();
+  $('#lf-t').value=it.t;$('#lf-y').value=it.y||'';
+  if(it.local){var f=film(it.k);logCtx.tmdb=null;if(f&&f.m&&!$('#lf-m').value)$('#lf-m').value=fmtDurShort(f.m);$('#lf-r').focus();return;}
+  logCtx.tmdb={id:it.tm,t:it.t,y:it.y||'',p:it.p};
+  $('#lf-r').focus();
+  tmdbGet({id:it.tm}).then(function(d){
+    var fi=d&&d.fiche;if(!fi||!logCtx.tmdb||logCtx.tmdb.id!==it.tm)return;
+    logCtx.tmdb.m=fi.m;logCtx.tmdb.dr=fi.dr;if(fi.p)logCtx.tmdb.p=fi.p;
+    if(fi.m&&!$('#lf-m').value)$('#lf-m').value=fmtDurShort(fi.m);
+  },function(){});
+}
+function brancherSug(){
+  var t=$('#lf-t'),b=$('#lf-sug');if(!TMDB_FN||!t||!b)return;
+  t.removeAttribute('list');
+  t.addEventListener('input',function(){
+    if(logCtx)logCtx.tmdb=null;
+    var q=t.value.trim();clearTimeout(sugTimer);
+    if(q.length<2){fermerSug();return;}
+    sugTimer=setTimeout(function(){chercherSug(q);},250);
+  });
+  t.addEventListener('keydown',function(ev){
+    if(b.hidden||!sugItems.length){return;}
+    var bt=b.querySelectorAll('.si');
+    if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();sugIdx=(sugIdx+(ev.key==='ArrowDown'?1:-1)+bt.length)%bt.length;bt.forEach(function(x,j){x.classList.toggle('on',j===sugIdx);});bt[sugIdx].scrollIntoView({block:'nearest'});}
+    else if(ev.key==='Enter'&&sugIdx>=0){ev.preventDefault();choisirSug(sugIdx);}
+    else if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();fermerSug();}
+  });
+  t.addEventListener('blur',function(){setTimeout(function(){if(document.activeElement&&b.contains(document.activeElement))return;fermerSug();},180);});
+  b.addEventListener('mousedown',function(ev){ev.preventDefault();});
+  b.addEventListener('click',function(ev){var x=ev.target.closest('.si');if(x)choisirSug(+x.dataset.i);});
 }
 
 /* ---------- Rendu ---------- */
@@ -202,7 +291,8 @@ function render(){
 function poster(f,cls){
   var c=PAL[hash(f.k||f.t||'')%PAL.length],L=(f.t||'').length;
   var sz=L<=6?'s':L<=14?'m':L<=28?'l':'xl';
-  return '<div class="poster '+(cls||'')+' sz-'+sz+'" style="--pc:'+c+'" aria-hidden="true"><span class="pt">'+esc(f.t)+'</span><span class="py">'+esc(f.y)+'</span></div>';
+  var img=f.p?'<img src="'+IMG+(cls==='mini'?'w92':'w342')+esc(f.p)+'" alt="" loading="lazy" decoding="async" onerror="this.remove()">':'';
+  return '<div class="poster '+(cls||'')+' sz-'+sz+(f.p?' has-img':'')+'" style="--pc:'+c+'" aria-hidden="true"><span class="pt">'+esc(f.t)+'</span><span class="py">'+esc(f.y)+'</span>'+img+'</div>';
 }
 function ticket(e,f,example){
   var p=(e.d||'').split('-');
@@ -240,7 +330,7 @@ journal:function(){
 },
 films:function(){
   var n=Object.values(S.films).filter(function(f){return f.w;}).length;
-  if(!n)return '<div class="viewhead"><h2>Films</h2></div><div class="card-box"><h3>Aucun film vu pour l’instant</h3><p>Chaque film que tu notes ou que tu importes apparaît ici, avec son affiche typographique.</p><div class="btnrow"><button class="primary" type="button" data-action="log">Noter un film</button><a class="ghost" href="#demenager" style="text-decoration:none;color:inherit">Importer</a></div></div>';
+  if(!n)return '<div class="viewhead"><h2>Films</h2></div><div class="card-box"><h3>Aucun film vu pour l’instant</h3><p>Chaque film que tu notes ou que tu importes apparaît ici, avec son affiche.</p><div class="btnrow"><button class="primary" type="button" data-action="log">Noter un film</button><a class="ghost" href="#demenager" style="text-decoration:none;color:inherit">Importer</a></div></div>';
   var chip=function(id,l){return '<button type="button" data-action="ffilter" data-v="'+id+'" aria-pressed="'+(ffilter===id)+'">'+l+'</button>';};
   return '<div class="viewhead"><h2>Films</h2><p class="sub" id="fcount"></p></div>'+
    '<div class="controls"><input type="search" id="fq" placeholder="Chercher un titre ou une année" value="'+esc(fq)+'" aria-label="Chercher un film">'+
@@ -344,7 +434,7 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Import Letterboxd complet, export CSV et JSON</span></div>'+
   '<div><span class="st ok">Fait</span><span>Compteur d’heures passées devant l’écran</span></div>'+
   '<div><span class="st ok">Fait</span><span>Connexion avec Twitch, carnet enregistré sur ton compte</span></div>'+
-  '<div><span class="st">Ensuite</span><span>Fiches films avec vraies données (base ouverte type TMDB)</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Vraies affiches, durées et réalisateurs grâce à TMDB</span></div>'+
   '<div><span class="st">Ensuite</span><span>Profils publics, amis, fil d’activité</span></div>'+
   '<div><span class="st">Plus tard</span><span>Fédération : ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
   '</div></section></article>';
@@ -405,6 +495,12 @@ function clampLines(x,lines,max,maxW){
   out[max-1]=last+'…';return out;
 }
 function drawPoster(x,f,X,Y,w,h){
+  var im=f.p&&AFF[f.p];
+  if(im){ /* vraie affiche TMDB, recadrée pour remplir le cadre */
+    x.save();rr(x,X,Y,w,h,18);x.clip();
+    var s=Math.max(w/im.naturalWidth,h/im.naturalHeight),iw=im.naturalWidth*s,ih=im.naturalHeight*s;
+    x.drawImage(im,X+(w-iw)/2,Y+(h-ih)/2,iw,ih);x.restore();return;
+  }
   var c=PAL[hash(f.k||f.t||'')%PAL.length];
   x.save();x.textAlign='left';rr(x,X,Y,w,h,18);x.clip();
   x.fillStyle=c;x.fillRect(X,Y,w,h);
@@ -494,6 +590,7 @@ function openShare(id){
   closeDialog($('#log'));closeDialog($('#sheet'));showDialog($('#share'));
   var fonts=['900 86px "Big Shoulders Display"','800 60px "Big Shoulders Display"','500 40px "Instrument Sans"','500 28px "IBM Plex Mono"'];
   var ready=(document.fonts&&document.fonts.load)?Promise.all(fonts.map(function(s){return document.fonts.load(s).catch(function(){});})):Promise.resolve();
+  var se=S.diary.find(function(x){return x.id===id;});ready=Promise.all([ready,chargerAffiche(se&&film(se.k))]);
   timeout(ready,2500).catch(function(){}).then(renderShare);
 }
 function slug(s){return norm(s).replace(/\s+/g,'-').slice(0,40)||'film';}
@@ -567,6 +664,7 @@ function openLog(o){
   $('#lf-tg').value=e?(e.tg||''):'';
   getRating=picker($('#lf-r'),e?(e.r||0):0);
   $('#lf-del').hidden=!e;$('#lf-share').hidden=!e;$('#lf-confirm').hidden=true;$('#lf-err').textContent='';
+  fermerSug();
   closeDialog($('#sheet'));
   showDialog($('#log'));
   setTimeout(function(){(f?$('#lf-r'):$('#lf-t')).focus();},60);
@@ -581,7 +679,11 @@ $('#logform').addEventListener('submit',function(ev){
   var mm=parseDur($('#lf-m').value);
   if(mm<0||mm>1500){err.textContent='Durée non comprise. Écris par exemple 1h20, 80 ou 1:20.';$('#lf-m').focus();return;}
   var d=$('#lf-d').value||today(),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim();
-  var f=ensureFilm(t,y);f.w=true;f.wl=null;if(r)f.r=r;if(l)f.l=true;if(mm)f.m=mm;
+  var tm=logCtx.tmdb&&logCtx.tmdb.t===t&&logCtx.tmdb.y===y?logCtx.tmdb:null,f=null;
+  if(tm)f=Object.values(S.films).find(function(x){return x.tm===tm.id;})||null;
+  if(!f)f=ensureFilm(t,y);
+  if(tm){f.tm=tm.id;if(tm.p)f.p=tm.p;if(tm.dr)f.dr=tm.dr;if(!mm&&tm.m&&!f.m)f.m=tm.m;}
+  f.w=true;f.wl=null;if(r)f.r=r;if(l)f.l=true;if(mm)f.m=mm;
   if(logCtx.id){var e=S.diary.find(function(x){return x.id===logCtx.id;});if(e){e.k=f.k;e.d=d;e.r=r;e.l=l;e.rw=rw;e.rv=rv;e.tg=tg;}}
   else S.diary.push({id:uid(),k:f.k,d:d,r:r,l:l,rw:rw,rv:rv,tg:tg,ts:Date.now()});
   closeDialog($('#log'));
@@ -598,7 +700,7 @@ function renderSheet(){
   var opts=S.lists.filter(function(l){return l.items.indexOf(f.k)<0;}).map(function(l){return '<option value="'+esc(l.id)+'">'+esc(l.n)+'</option>';}).join('');
   var inL=S.lists.filter(function(l){return l.items.indexOf(f.k)>=0;}).map(function(l){return esc(l.n);});
   $('#sheet-body').innerHTML='<div class="dh"><span class="sub">Fiche du film</span><button type="button" class="x" data-action="close" aria-label="Fermer">×</button></div>'+
-   '<div class="sheet-top">'+poster(f)+'<div><h2>'+esc(f.t)+'</h2><span class="fy">'+esc(f.y||'année inconnue')+'</span>'+
+   '<div class="sheet-top">'+poster(f)+'<div><h2>'+esc(f.t)+'</h2><span class="fy">'+esc(f.y||'année inconnue')+'</span>'+(f.dr?'<span class="dr">de '+esc(f.dr)+'</span>':'')+
    '<div class="sheet-acts"><button class="ghost small" type="button" data-action="tlike" aria-pressed="'+!!f.l+'">♥ Coup de cœur</button><button class="ghost small" type="button" data-action="twl" aria-pressed="'+!!f.wl+'">À voir</button></div></div></div>'+
    '<div class="dbody"><div class="fld"><span id="sh-r-l">Ta note</span><div id="sh-r" class="picker" role="slider" tabindex="0" aria-labelledby="sh-r-l" aria-valuemin="0" aria-valuemax="5"></div></div>'+
    '<form class="fld" id="sh-dur" autocomplete="off"><span>Durée</span><div class="durrow"><input name="m" value="'+esc(fmtDurShort(f.m))+'" placeholder="1h30" aria-label="Durée du film"><button class="ghost small" type="submit">Enregistrer</button></div></form>'+
@@ -630,12 +732,12 @@ function importFiles(files){
       var t={films:0,diary:0,lists:0};
       carnets.forEach(function(x){var c=fusionner(x);t.films+=c.films;t.diary+=c.diary;t.lists+=c.lists;});
       importReport='<div class="report"><b>Carnet Bobine importé.</b><ul><li>'+plural(t.films,'film nouveau','films nouveaux')+'</li><li>'+plural(t.diary,'séance','séances')+'</li><li>'+plural(t.lists,'liste','listes')+'</li></ul></div>';
-      commit();toast('Import terminé');return;
+      commit();toast('Import terminé');setTimeout(rattraper,800);return;
     }
     var rep=mergeLB(texts);
     if(!rep){importReport='<div class="report"><b>Rien à importer.</b> Ce fichier ne ressemble pas à un export Letterboxd. Il faut le .zip téléchargé depuis Settings → Data, ou les fichiers diary.csv, ratings.csv, watched.csv qu’il contient.</div>';render();return;}
     importReport='<div class="report"><b>Bienvenue chez toi.</b> Import terminé :<ul>'+rep+'</ul></div>';
-    commit();toast('Import terminé');
+    commit();toast('Import terminé');setTimeout(rattraper,800);
   }).catch(function(){res.innerHTML='<div class="report">Impossible de lire ce fichier. Vérifie que c’est bien le .zip d’export Letterboxd, sans le renommer.</div>';});
 }
 function mergeLB(texts){
@@ -790,6 +892,7 @@ window.addEventListener('hashchange',function(){if(route()!=='listes')openListId
 
 /* ---------- Démarrage ---------- */
 var cached=lsGet(LS);if(cached)S=upgrade(cached);
-render();renderCompte();
+render();renderCompte();brancherSug();
 connect();
+if(!sb)setTimeout(rattraper,1500);
 })();

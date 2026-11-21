@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="bobine.css?v=1">
+<link rel="stylesheet" href="bobine.css?v=2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -27,6 +27,7 @@
 <nav class="tabs" aria-label="Sections"><ul id="tabs"></ul></nav>
 
 <main class="wrap" id="view" tabindex="-1"></main>
+<footer class="credits wrap"><a href="https://www.themoviedb.org" target="_blank" rel="noopener" aria-label="The Movie Database"><img src="images/logo-tmdb.svg" alt="TMDB" width="28" height="28"></a><p>Affiches, durées et réalisateurs : <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.<br>This product uses the TMDB API but is not endorsed or certified by TMDB.</p></footer>
 
 <button class="fab" type="button" data-action="log">+ Noter</button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -37,7 +38,7 @@
     <div class="dh"><h2 id="log-title">Noter un film</h2><button type="button" class="x" data-action="close" aria-label="Fermer">×</button></div>
     <div class="dbody">
       <div class="row2">
-        <label class="fld"><span>Titre</span><input id="lf-t" name="t" list="known" autocomplete="off" placeholder="Paris, Texas"></label>
+        <div class="fld-sug"><label class="fld"><span>Titre</span><input id="lf-t" name="t" list="known" autocomplete="off" placeholder="Tape le début du titre" aria-controls="lf-sug"></label><div class="sug" id="lf-sug" role="listbox" hidden></div></div>
         <label class="fld"><span>Année</span><input id="lf-y" name="y" inputmode="numeric" maxlength="4" placeholder="1984"></label>
       </div>
       <div class="row2 dur">
@@ -84,6 +85,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
 <script src="paris-config.js?v=8"></script>
-<script src="bobine.js?v=1"></script>
+<script src="bobine.js?v=2"></script>
 </body>
 </html>
