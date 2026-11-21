@@ -1,11 +1,11 @@
 /* Bobine : styles repris du prototype v0 */
 :root{
   /* Layout : une colonne de carnet (760px max), marquise lumineuse en tête, onglets collants, séances en tickets perforés. */
-  --bg:#eceef2;
-  --surface:#ffffff;
-  --ink:#15171c;
-  --muted:#5b6270;
-  --line:#d6dae1;
+  --bg:#f3ede2;
+  --surface:#fbf8f2;
+  --ink:#1c1915;
+  --muted:#6a6256;
+  --line:#e2d8c6;
   --accent:#cf2338;
   --on-accent:#ffffff;
   --gold:#a86f00;
@@ -385,3 +385,57 @@ body.lecture .ticket{cursor:default}
 .sign{border-top:1px solid var(--line);padding:10px 0}
 .sign blockquote{margin:6px 0 10px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--bg);border-radius:4px}
 body[data-vue=forum] .fab,body[data-vue=contact] .fab,body[data-vue=admin] .fab{display:none}
+
+/* ===== 1.6 : couleurs au choix ===== */
+:root[data-accent="bordeaux"]{--accent:#8c1d36;--on-accent:#ffffff}
+:root[data-theme="dark"][data-accent="bordeaux"]{--accent:#e2647f;--on-accent:#1d0509}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-accent="bordeaux"]{--accent:#e2647f;--on-accent:#1d0509}}
+:root[data-accent="sapin"]{--accent:#1e6a4c;--on-accent:#ffffff}
+:root[data-theme="dark"][data-accent="sapin"]{--accent:#5cc99e;--on-accent:#04140d}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-accent="sapin"]{--accent:#5cc99e;--on-accent:#04140d}}
+:root[data-accent="nuit"]{--accent:#25448e;--on-accent:#ffffff}
+:root[data-theme="dark"][data-accent="nuit"]{--accent:#86a6ff;--on-accent:#060d22}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-accent="nuit"]{--accent:#86a6ff;--on-accent:#060d22}}
+:root[data-accent="moutarde"]{--accent:#8a5d00;--on-accent:#ffffff}
+:root[data-theme="dark"][data-accent="moutarde"]{--accent:#f2b632;--on-accent:#1a1200}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-accent="moutarde"]{--accent:#f2b632;--on-accent:#1a1200}}
+:root[data-accent="violet"]{--accent:#6b3fca;--on-accent:#ffffff}
+:root[data-theme="dark"][data-accent="violet"]{--accent:#ad91ff;--on-accent:#12082b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"])[data-accent="violet"]{--accent:#ad91ff;--on-accent:#12082b}}
+.pc-rouge i{background:#cf2338}.pc-bordeaux i{background:#8c1d36}.pc-sapin i{background:#1e6a4c}.pc-nuit i{background:#25448e}.pc-moutarde i{background:#d79a12}.pc-violet i{background:#6b3fca}
+
+/* Apparence */
+.cbtn.ico{display:inline-grid;place-items:center;width:28px;height:26px;padding:0}
+#app-body{display:flex;flex-direction:column;gap:16px}
+.segs{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg{flex:1;border:0;background:var(--surface);padding:10px 6px;font-weight:600}
+.seg+.seg{border-left:1px solid var(--line)}
+.seg[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.pastilles-c{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pc{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 10px;font-weight:600;text-align:left}
+.pc i{width:20px;height:20px;border-radius:50%;flex:0 0 20px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+.pc[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+
+/* Spoilers */
+.spoiler{position:relative;cursor:pointer;border-radius:6px}
+.spoiler .sp-txt{filter:blur(6px);user-select:none;transition:filter .25s}
+.spoiler .sp-lbl{position:absolute;inset:0;display:grid;place-items:center;font:700 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);text-align:center}
+.spoiler.vu{cursor:auto}
+.spoiler.vu .sp-txt{filter:none;user-select:auto}
+.spoiler.vu .sp-lbl{display:none}
+
+/* Le ticket qui se détache quand on note un film */
+@media (prefers-reduced-motion: no-preference){
+  .ticket.nouveau{animation:ticketArrive .55s cubic-bezier(.2,.9,.3,1.2) both}
+  .ticket.nouveau .stub{animation:talonDechire .9s .45s ease both;transform-origin:100% 100%}
+  @keyframes ticketArrive{0%{opacity:0;transform:translateY(-22px) rotate(-2.5deg) scale(.96)}100%{opacity:1;transform:none}}
+  @keyframes talonDechire{0%{transform:none}35%{transform:translateX(-10px) rotate(-7deg)}60%{transform:translateX(-4px) rotate(-3deg)}100%{transform:none}}
+  .marquee.coeur .bulbs{animation:chenillard .18s steps(1) 12,ampoulesCoeur 2.4s ease both}
+  .marquee.coeur .tagline{animation:taglineCoeur 2.4s ease both}
+  @keyframes chenillard{0%{background-position:0 0}50%{background-position:8px 0}}
+  @keyframes ampoulesCoeur{0%{filter:none}15%{filter:brightness(1.8) drop-shadow(0 0 6px var(--bulb))}85%{filter:brightness(1.8) drop-shadow(0 0 6px var(--bulb))}100%{filter:none}}
+  @keyframes taglineCoeur{0%,100%{text-shadow:none}20%,80%{text-shadow:0 0 14px var(--bulb)}}
+}
+@media (prefers-reduced-motion: reduce){
+  .marquee.coeur .bulbs{filter:brightness(1.6)}
+}

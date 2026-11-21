@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.5';
+var VERSION='1.6';
 var NOUVEAUTES=[
+  ['1.6','Fond crème ou sombre et six couleurs au choix, ticket qui se détache, ampoules pour les coups de cœur, critiques avec spoilers floutés, plus de compteur de séances'],
   ['1.5','Forum pour les idées, les bugs et les discussions, et conversation privée avec l’équipe'],
   ['1.4','Carnets publics avec un lien à partager, carnet privé en un clic, suppression du carnet et page Confidentialité'],
   ['1.3','La date de visionnage devient un bonus, et le temps devant l’écran se compte depuis toujours'],
@@ -69,7 +70,7 @@ function commit(opts){
 
 /* Ce qui est comparé pour savoir si un élément a changé */
 function sigFilm(f){return JSON.stringify([f.t,f.y,f.r||null,!!f.l,!!f.w,f.wl||null,f.m||null,f.tm==null?null:f.tm,f.p||null,f.dr||null]);}
-function sigSeance(e){return JSON.stringify([e.k,e.d||'',e.r||null,!!e.l,!!e.rw,e.rv||'',e.tg||'',e.u||'']);}
+function sigSeance(e){return JSON.stringify([e.k,e.d||'',e.r||null,!!e.l,!!e.rw,e.rv||'',e.tg||'',e.u||'',!!e.sp]);}
 function sigListe(l,i){return JSON.stringify([l.n,l.ds||'',l.items,i]);}
 function photo(){
   var p={films:{},diary:{},lists:{}};
@@ -83,7 +84,7 @@ function differences(){
   Object.keys(S.films).forEach(function(k){var f=S.films[k];if(L.films[k]!==sigFilm(f))c.films.push({k:k,t:f.t,y:f.y,r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null,tm:f.tm==null?null:f.tm,p:f.p||null,dr:f.dr||null});});
   Object.keys(L.films).forEach(function(k){if(!S.films[k])c.films_suppr.push(k);});
   var ids={};
-  S.diary.forEach(function(e){ids[e.id]=1;if(L.diary[e.id]!==sigSeance(e))c.seances.push({id:e.id,k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||null});});
+  S.diary.forEach(function(e){ids[e.id]=1;if(L.diary[e.id]!==sigSeance(e))c.seances.push({id:e.id,k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||null,sp:!!e.sp});});
   Object.keys(L.diary).forEach(function(id){if(!ids[id])c.seances_suppr.push(id);});
   var lids={};
   S.lists.forEach(function(l,i){lids[l.id]=1;if(L.lists[l.id]!==sigListe(l,i))c.listes.push({id:l.id,n:l.n,ds:l.ds||'',items:l.items,rang:i});});
@@ -125,7 +126,7 @@ function fusionner(x){
   x=upgrade(x);var c={films:0,diary:0,lists:0};
   Object.keys(x.films).forEach(function(k){var f=x.films[k];if(!f||!f.t)return;if(!S.films[k]){S.films[k]={k:k,t:String(f.t),y:String(f.y||''),r:f.r||null,l:!!f.l,w:!!f.w,wl:f.wl||null,m:f.m||null,tm:f.tm==null?null:f.tm,p:f.p||null,dr:f.dr||null};c.films++;}});
   var ids={},lieu={};S.diary.forEach(function(e){ids[e.id]=1;lieu[e.k+'#'+e.d]=1;});
-  x.diary.forEach(function(e){if(!e||!e.k||!S.films[e.k]||ids[e.id]||lieu[e.k+'#'+(e.d||'')]&&!e.rv)return;S.diary.push({id:e.id||uid(),k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||Date.now()});ids[e.id]=1;c.diary++;});
+  x.diary.forEach(function(e){if(!e||!e.k||!S.films[e.k]||ids[e.id]||lieu[e.k+'#'+(e.d||'')]&&!e.rv)return;S.diary.push({id:e.id||uid(),k:e.k,d:e.d||'',r:e.r||null,l:!!e.l,rw:!!e.rw,rv:e.rv||'',tg:e.tg||'',u:e.u||'',ts:e.ts||Date.now(),sp:!!e.sp});ids[e.id]=1;c.diary++;});
   x.lists.forEach(function(l){if(!l||!l.n)return;var ex=S.lists.find(function(y){return y.id===l.id||y.n===l.n;});var items=(l.items||[]).filter(function(k){return S.films[k];});if(ex){items.forEach(function(k){if(ex.items.indexOf(k)<0)ex.items.push(k);});}else{S.lists.push({id:l.id||uid(),n:String(l.n),ds:l.ds||'',items:items});c.lists++;}});
   return c;
 }
@@ -504,6 +505,37 @@ function actionForum(act,a){
   }
 }
 
+/* ---------- Apparence : fond crème ou sombre, couleur au choix (gardé sur cet appareil) ---------- */
+var THEMES=[['auto','Auto'],['creme','Crème'],['sombre','Sombre']];
+var ACCENTS=[['rouge','Rouge cinéma'],['bordeaux','Bordeaux'],['sapin','Vert sapin'],['nuit','Bleu nuit'],['moutarde','Moutarde'],['violet','Violet']];
+function lireApparence(){try{return JSON.parse(localStorage.getItem('bobine.apparence')||'{}')||{};}catch(e){return {};}}
+function appliquerApparence(a){
+  var r=document.documentElement;
+  if(a.theme==='creme')r.dataset.theme='light';else if(a.theme==='sombre')r.dataset.theme='dark';else delete r.dataset.theme;
+  if(a.accent&&a.accent!=='rouge')r.dataset.accent=a.accent;else delete r.dataset.accent;
+  var m=document.querySelector('meta[name=theme-color]');if(m)m.content=getComputedStyle(r).getPropertyValue('--marquee').trim()||'#111216';
+}
+function choisirApparence(theme,accent){
+  var a=lireApparence();if(theme)a.theme=theme;if(accent)a.accent=accent;
+  try{localStorage.setItem('bobine.apparence',JSON.stringify(a));}catch(e){}
+  appliquerApparence(a);renderApparence();
+}
+function ouvrirApparence(){renderApparence();showDialog($('#apparence'));}
+function renderApparence(){
+  var a=lireApparence(),t=a.theme||'auto',c=a.accent||'rouge';
+  $('#app-body').innerHTML='<div class="fld"><span>Fond</span><div class="segs">'+THEMES.map(function(x){return '<button type="button" class="seg" data-action="theme" data-v="'+x[0]+'" aria-pressed="'+(t===x[0])+'">'+x[1]+'</button>';}).join('')+'</div>'+
+    '<p class="muted petit">Auto suit le réglage de ton téléphone ou de ton ordi.</p></div>'+
+    '<div class="fld"><span>Couleur</span><div class="pastilles-c">'+ACCENTS.map(function(x){return '<button type="button" class="pc pc-'+x[0]+'" data-action="accent" data-v="'+x[0]+'" aria-pressed="'+(c===x[0])+'"><i></i>'+x[1]+'</button>';}).join('')+'</div></div>'+
+    '<p class="muted petit">Ton choix reste sur cet appareil.</p>'+
+    '<div class="df"><span class="sp"></span><button type="button" class="primary" data-action="close">Fermer</button></div>';
+}
+/* Ampoules du bandeau qui s'allument pour un coup de cœur */
+function allumerAmpoules(){
+  var m=document.querySelector('.marquee');if(!m)return;
+  m.classList.remove('coeur');void m.offsetWidth;m.classList.add('coeur');
+  clearTimeout(allumerAmpoules.t);allumerAmpoules.t=setTimeout(function(){m.classList.remove('coeur');},2600);
+}
+
 /* ---------- Rendu ---------- */
 var journalLimit=60,gridLimit=120,fq='',fsort='recent',ffilter='all',openListId=null,confirmWipe=false,listConfirm=false,importReport='';
 
@@ -513,7 +545,7 @@ function renderAffiche(){
   var films=Object.values(S.films).filter(function(f){return f.w;}).length;
   var rv=S.diary.filter(function(e){return e.rv;}).length;
   var t=screenTime();
-  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche, "+fmtDur(t.total)+' devant l’écran, '+plural(S.diary.length,'séance','séances')+', '+plural(rv,'critique','critiques');
+  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche, "+fmtDur(t.total)+' devant l’écran, '+plural(rv,'critique','critiques');
 }
 /* Temps devant l'écran : chaque séance compte (revoyures comprises) ; un film vu sans séance datée compte une fois. */
 function screenTime(year){
@@ -543,6 +575,7 @@ function render(){
     return;
   }
   v.innerHTML=VIEWS[r]();
+  if(dernierAjout)setTimeout(function(){dernierAjout=null;},1600);
   if(r==='films')fillGrid();
   if(r==='demenager')wireDrop();
   updateDatalist();
@@ -554,14 +587,20 @@ function poster(f,cls){
   var img=f.p?'<img src="'+IMG+(cls==='mini'?'w92':'w342')+esc(f.p)+'" alt="" loading="lazy" decoding="async" onerror="this.remove()">':'';
   return '<div class="poster '+(cls||'')+' sz-'+sz+(f.p?' has-img':'')+'" style="--pc:'+c+'" aria-hidden="true"><span class="pt">'+esc(f.t)+'</span><span class="py">'+esc(f.y)+'</span>'+img+'</div>';
 }
+function critique(e,cls){
+  if(!e.sp)return '<p class="'+cls+'">'+esc(e.rv)+'</p>';
+  return '<p class="'+cls+' spoiler" data-action="spoil" tabindex="0" role="button" aria-label="Critique avec spoilers, toucher pour lire"><span class="sp-txt">'+esc(e.rv)+'</span><span class="sp-lbl">Spoilers, touche pour lire</span></p>';
+}
+var dernierAjout=null;
 function ticket(e,f,example){
   var p=(e.d||'').split('-');
+  var nouveau=!example&&e.id===dernierAjout;
   var attrs=example?'':' data-action="edit" data-id="'+esc(e.id)+'" tabindex="0" role="button" aria-label="Modifier la séance de '+esc(f.t)+'"';
-  return '<article class="ticket'+(example?' example':'')+'"'+attrs+'>'+
+  return '<article class="ticket'+(example?' example':'')+(nouveau?' nouveau':'')+'"'+attrs+'>'+
     (e.d?'<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>':'<div class="stub nodate"><span class="mon">vu</span></div>')+
     '<div class="tbody"><h4>'+esc(f.t)+' <span class="fy">'+esc(f.y)+'</span></h4>'+
     '<div class="meta">'+(e.r?'<span class="stars" aria-label="'+ratingWords(e.r)+'">'+stars(e.r)+'</span>':'')+(e.l?'<span class="heart" aria-label="Coup de cœur">♥</span>':'')+(e.rw?'<span class="tag">revu</span>':'')+((f.m||e.m)?'<span class="dur-tag">'+fmtDurShort(f.m||e.m)+'</span>':'')+(example?'<span class="tag ex">exemple</span>':'')+'</div>'+
-    (e.rv?'<p class="rv">'+esc(e.rv)+'</p>':'')+'</div>'+poster(f,'mini')+'</article>';
+    (e.rv?critique(e,'rv'):'')+'</div>'+poster(f,'mini')+'</article>';
 }
 
 var VIEWS={
@@ -579,7 +618,7 @@ journal:function(){
       '</section>';
   }
   var list=S.diary.slice().sort(function(a,b){return (b.d||'').localeCompare(a.d||'')||(b.ts||0)-(a.ts||0);});
-  var h='<div class="viewhead"><h2>Journal</h2><p class="sub">'+plural(list.length,'séance','séances')+'</p></div>',cur=null;
+  var h='<div class="viewhead"><h2>Journal</h2></div>',cur=null;
   list.slice(0,journalLimit).forEach(function(e){
     var f=film(e.k)||{k:e.k,t:'Film inconnu',y:''},ym=(e.d||'').slice(0,7);
     if(ym!==cur){cur=ym;h+='<h3 class="month">'+monthLabel(ym)+'</h3>';}
@@ -642,7 +681,7 @@ bilan:function(){
     '<section class="clock" aria-label="Compteur d’heures"><span class="lbl">Temps passé devant l’écran</span><span class="big">'+fmtDur(st.total)+'</span>'+
     '<span class="lbl">depuis ton premier film'+(days>=1?', soit '+days.toFixed(1).replace('.',',')+' jours':'')+(st.unknown?', durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
     '<div class="tiles">'+
-    tile(fmtN(films.length),'films vus')+tile(fmtN(S.diary.length),'séances')+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>';
+    tile(fmtN(films.length),'films vus')+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>';
   // distribution des notes
   var dist=[0,0,0,0,0,0,0,0,0,0];rated.forEach(function(f){var i=Math.round(f.r*2)-1;if(i>=0&&i<10)dist[i]++;});
   var maxI=dist.indexOf(Math.max.apply(null,dist));
@@ -697,7 +736,7 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Vraies affiches, durées et réalisateurs grâce à TMDB</span></div>'+
   '<div><span class="st ok">Fait</span><span>Carnets publics avec un lien, carnet privé en un clic</span></div>'+
   '<div><span class="st ok">Fait</span><span>Forum et conversation privée avec l’équipe</span></div>'+
-  '<div><span class="st">Ensuite</span><span>Mode salle obscure, ticket qui se détache, spoilers floutés</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Fond crème ou sombre, couleurs au choix, spoilers floutés</span></div>'+
   '<div><span class="st">Ensuite</span><span>Bilan en story, défis et succès, roulette À voir</span></div>'+
   '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
   '</div></section>'+
@@ -809,7 +848,7 @@ function buildCard(e){
   x.textBaseline='alphabetic';
   /* en-tête, sous la zone du profil */
   x.fillStyle=ink;x.font='900 64px '+disp;x.textAlign='left';x.fillText('BOBINE',M,318);
-  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv?'CRITIQUE':'SÉANCE')+(e.d?'  '+fmtDate(e.d).toUpperCase():''),W-M,312);
+  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv&&!e.sp?'CRITIQUE':'SÉANCE')+(e.d?'  '+fmtDate(e.d).toUpperCase():''),W-M,312);
   /* affiche */
   var pw=420,ph=630,py=350;drawPoster(x,f,(W-pw)/2,py,pw,ph);
   /* titre sous l'affiche, toujours */
@@ -832,7 +871,7 @@ function buildCard(e){
   }else y-=60;
   /* critique */
   var safeBottom=H-300,stickerBand=90;
-  if(e.rv){
+  if(e.rv&&!e.sp){
     var rs=40,lh=Math.round(rs*1.38),maxW=W-2*M-76,top=y+44;
     x.font='500 '+rs+'px '+body;
     var maxL=Math.max(2,Math.min(5,Math.floor((safeBottom-stickerBand-top-60)/lh)));
@@ -855,7 +894,7 @@ function buildCard(e){
 function caption(e){
   var f=film(e.k)||{t:'?',y:''};
   var head=f.t+(f.y?' ('+f.y+')':'')+(e.r?' '+stars(e.r):'')+(e.l?' ♥':'');
-  var rv=e.rv?'\n« '+(e.rv.length>180?e.rv.slice(0,178).trimEnd()+'…':e.rv)+' »':'';
+  var rv=e.rv&&!e.sp?'\n« '+(e.rv.length>180?e.rv.slice(0,178).trimEnd()+'…':e.rv)+' »':'';
   return head+rv+'\n'+(SITE_URL?SITE_URL+' ':'')+'#Bobine #cinema';
 }
 function renderShare(){
@@ -945,7 +984,7 @@ function openLog(o){
   $('#lf-m').value=f&&f.m?fmtDurShort(f.m):'';
   $('#lf-l').checked=e?!!e.l:!!(f&&f.l);
   $('#lf-rw').checked=e?!!e.rw:!!(f&&S.diary.some(function(x){return x.k===f.k;}));
-  $('#lf-rv').value=e?(e.rv||''):'';
+  $('#lf-rv').value=e?(e.rv||''):'';$('#lf-sp').checked=!!(e&&e.sp);
   $('#lf-tg').value=e?(e.tg||''):'';
   getRating=picker($('#lf-r'),e?(e.r||0):0);
   $('#lf-del').hidden=!e;$('#lf-share').hidden=!e;$('#lf-confirm').hidden=true;$('#lf-err').textContent='';
@@ -963,15 +1002,15 @@ $('#logform').addEventListener('submit',function(ev){
   if(y&&!/^\d{4}$/.test(y)){err.textContent='L’année s’écrit avec 4 chiffres, par exemple 1984.';$('#lf-y').focus();return;}
   var mm=parseDur($('#lf-m').value);
   if(mm<0||mm>1500){err.textContent='Durée non comprise. Écris par exemple 1h20, 80 ou 1:20.';$('#lf-m').focus();return;}
-  var d=$('#lf-d-box').hidden?'':($('#lf-d').value||''),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim();
+  var d=$('#lf-d-box').hidden?'':($('#lf-d').value||''),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim(),sp=!!rv&&$('#lf-sp').checked;
   var tm=logCtx.tmdb&&logCtx.tmdb.t===t&&logCtx.tmdb.y===y?logCtx.tmdb:null,f=null;
   if(tm)f=Object.values(S.films).find(function(x){return x.tm===tm.id;})||null;
   if(!f&&!tm&&!y){var memes=Object.values(S.films).filter(function(x){return norm(x.t)===norm(t);});if(memes.length===1)f=memes[0];}
   if(!f)f=ensureFilm(t,y);
   if(tm){f.tm=tm.id;if(tm.p)f.p=tm.p;if(tm.dr)f.dr=tm.dr;if(!mm&&tm.m&&!f.m)f.m=tm.m;}
   f.w=true;f.wl=null;if(r)f.r=r;if(l)f.l=true;if(mm)f.m=mm;
-  if(logCtx.id){var e=S.diary.find(function(x){return x.id===logCtx.id;});if(e){e.k=f.k;e.d=d;e.r=r;e.l=l;e.rw=rw;e.rv=rv;e.tg=tg;}}
-  else S.diary.push({id:uid(),k:f.k,d:d,r:r,l:l,rw:rw,rv:rv,tg:tg,ts:Date.now()});
+  if(logCtx.id){var e=S.diary.find(function(x){return x.id===logCtx.id;});if(e){var etaitCoeur=e.l;e.k=f.k;e.d=d;e.r=r;e.l=l;e.rw=rw;e.rv=rv;e.tg=tg;e.sp=sp;if(l&&!etaitCoeur)allumerAmpoules();}}
+  else{var nid=uid();S.diary.push({id:nid,k:f.k,d:d,r:r,l:l,rw:rw,rv:rv,tg:tg,ts:Date.now(),sp:sp});dernierAjout=nid;if(l)allumerAmpoules();}
   closeDialog($('#log'));
   commit();
   toast(logCtx.id?'Séance modifiée':'« '+f.t+' » ajouté au journal');
@@ -992,7 +1031,7 @@ function renderSheet(){
    '<form class="fld" id="sh-dur" autocomplete="off"><span>Durée</span><div class="durrow"><input name="m" value="'+esc(fmtDurShort(f.m))+'" placeholder="1h30" aria-label="Durée du film"><button class="ghost small" type="submit">Enregistrer</button></div></form>'+
    '<button class="primary" type="button" data-action="logk">+ Ajouter une séance</button>'+
    (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
-   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?', revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
+   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?', revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?critique(e,''):'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
    (sheetConfirm?'<div class="confirm">Retirer ce film et ses séances du carnet ? <button class="primary small" type="button" data-action="fkill">Oui, retirer</button><button class="ghost small" type="button" data-action="fnokill">Non</button></div>':'<div><button class="ghost danger small" type="button" data-action="faskkill">Retirer du carnet</button></div>')+
    '</div>';
   picker($('#sh-r'),f.r||0,function(v){f.r=v||null;f.w=true;commit();});
@@ -1128,6 +1167,7 @@ document.addEventListener('change',function(ev){
   if(ev.target.id==='fsort'){fsort=ev.target.value;fillGrid();}
 });
 document.addEventListener('keydown',function(ev){
+  if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('.spoiler')){ev.preventDefault();ev.target.classList.toggle('vu');return;}
   if(!LECTURE&&(ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('article.ticket[data-action]')){ev.preventDefault();openLog({id:ev.target.dataset.id});}
 });
 document.addEventListener('click',function(ev){
@@ -1135,7 +1175,7 @@ document.addEventListener('click',function(ev){
   ev.preventDefault();location.hash='#manifeste';
   setTimeout(function(){var n=$('#nouveautes');if(n)n.scrollIntoView({behavior:'smooth',block:'start'});},150);
 });
-var EN_LECTURE={close:1,more:1,gmore:1,ffilter:1,sheet:1,lopen:1,lback:1,compte:1};
+var EN_LECTURE={spoil:1,apparence:1,theme:1,accent:1,close:1,more:1,gmore:1,ffilter:1,sheet:1,lopen:1,lback:1,compte:1};
 document.addEventListener('click',function(ev){
   var a=ev.target.closest('[data-action]');if(!a)return;
   var act=a.dataset.action,L;
@@ -1179,6 +1219,10 @@ document.addEventListener('click',function(ev){
     case 'wipe':var keep=S.updatedAt;S=blank();S.updatedAt=keep;confirmWipe=false;importReport='';commit();toast('Carnet effacé');break;
     case 'login':seConnecter();break;
     case 'logout':closeDialog($('#compte-dlg'));seDeconnecter();break;
+    case 'spoil':a.classList.toggle('vu');break;
+    case 'apparence':ouvrirApparence();break;
+    case 'theme':choisirApparence(a.dataset.v,null);break;
+    case 'accent':choisirApparence(null,a.dataset.v);break;
     case 'compte':case 'cptcopie':case 'cptsuppr':case 'cptnon':actionCompte(act);break;
     case 'fzfiltre':case 'fzsuppr':case 'fzsignal':case 'fzmod':case 'fztraite':case 'fzban':actionForum(act,a);break;
   }
