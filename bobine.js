@@ -5,6 +5,17 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
+var VERSION='1.4';
+var NOUVEAUTES=[
+  ['1.4','Carnets publics avec un lien à partager, carnet privé en un clic, suppression du carnet et page Confidentialité'],
+  ['1.3','La date de visionnage devient un bonus, et le temps devant l’écran se compte depuis toujours'],
+  ['1.2','Formulaire plus simple, l’année et la durée se remplissent toutes seules'],
+  ['1.1','Vraies affiches, durées et réalisateurs avec TMDB, recherche pendant la frappe'],
+  ['1.0','Connexion avec Twitch, carnet enregistré sur ton compte']
+];
+/* Lecture du carnet de quelqu'un : bobine.html?carnet=pseudo (rien n'est jamais enregistré dans ce mode) */
+var LECTURE=null;try{LECTURE=(new URLSearchParams(location.search).get('carnet')||'').trim().slice(0,60)||null;}catch(e){}
+var LECTEUR={charge:false,trouve:false,pseudo:LECTURE,avatar:null};
 var ROUTES=[['journal','Journal'],['films','Films'],['a-voir','À voir'],['listes','Listes'],['bilan','Bilan'],['demenager','Déménager'],['manifeste','Manifeste']];
 
 function $(s,r){return (r||document).querySelector(s);}
@@ -42,13 +53,14 @@ var sb=(window.supabase&&CFG.url&&CFG.cle)?window.supabase.createClient(CFG.url,
 var Store={mode:'local',user:null,profil:null,saving:false,dirty:false,timer:null,last:null};
 function lsKey(){return Store.mode==='db'&&Store.user?'bobine.compte.'+Store.user:LS;}
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k||LS)||'null');}catch(e){return null;}}
-function lsSet(){try{localStorage.setItem(lsKey(),JSON.stringify(S));}catch(e){}}
+function lsSet(){if(LECTURE)return;try{localStorage.setItem(lsKey(),JSON.stringify(S));}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 var STATUS={local:'Sur cet appareil',loading:'Connexion…',pending:'Modifié',saving:'Enregistrement…',saved:'Synchronisé',error:'Échec, on réessaiera',full:'Espace plein',offline:'Hors ligne, gardé ici'};
 function setStatus(s){var c=$('#sync');c.dataset.s=s;c.lastElementChild.textContent=STATUS[s]||s;}
 function timeout(p,ms){return new Promise(function(res,rej){var t=setTimeout(function(){rej({code:'timeout'});},ms);p.then(function(v){clearTimeout(t);res(v);},function(e){clearTimeout(t);rej(e);});});}
 
 function commit(opts){
+  if(LECTURE){render();return;}
   S.updatedAt=Date.now();lsSet();
   if(Store.mode==='db'){clearTimeout(Store.timer);setStatus('pending');Store.timer=setTimeout(flush,900);}
   if(!opts||!opts.norender)render();
@@ -88,7 +100,7 @@ function paquets(c){
   return out;
 }
 function flush(){
-  if(Store.mode!=='db')return;
+  if(LECTURE||Store.mode!=='db')return;
   if(Store.saving){Store.dirty=true;return;}
   var c=differences(),parts=paquets(c);
   if(!parts.length){setStatus('saved');return;}
@@ -154,10 +166,11 @@ function seConnecter(){if(sb)sb.auth.signInWithOAuth({provider:'twitch',options:
 function seDeconnecter(){if(!sb)return;var fin=function(){sb.auth.signOut();};if(Store.saving||Store.dirty||Store.timer&&$('#sync').dataset.s==='pending'){clearTimeout(Store.timer);flush();setTimeout(fin,1500);}else fin();}
 function renderCompte(){
   var el=$('#compte');if(!el)return;
+  if(LECTURE){el.innerHTML='<a class="cbtn" href="bobine.html">Mon carnet</a>';return;}
   if(!sb){el.innerHTML='';return;}
   if(Store.mode==='db'&&Store.user){
     var p=Store.profil||{};
-    el.innerHTML=(p.avatar?'<img src="'+esc(p.avatar)+'" alt="" width="22" height="22">':'')+'<span class="cp">'+esc(p.pseudo||'Connecté')+'</span><button type="button" class="cbtn" data-action="logout">Déconnexion</button>';
+    el.innerHTML='<button type="button" class="cbtn moi" data-action="compte" aria-label="Mon compte">'+(p.avatar?'<img src="'+esc(p.avatar)+'" alt="" width="22" height="22">':'')+'<span class="cp">'+esc(p.pseudo||'Mon compte')+'</span></button>';
   }else{
     el.innerHTML='<button type="button" class="cbtn twitch" data-action="login">Se connecter avec Twitch</button>';
   }
@@ -176,7 +189,7 @@ function chargerAffiche(f){
 /* Rattrapage : retrouve sur TMDB les films importés (affiche, durée, réalisateur), 20 par 20, en tâche de fond */
 var ratt=false;
 function rattraper(){
-  if(!TMDB_FN||ratt)return;
+  if(LECTURE||!TMDB_FN||ratt)return;
   var liste=Object.values(S.films).filter(function(f){return f.tm==null&&f.t;});
   if(!liste.length)return;
   ratt=true;var i=0,ajoutes=0,gros=liste.length>15;
@@ -252,16 +265,66 @@ function brancherSug(){
   b.addEventListener('click',function(ev){var x=ev.target.closest('.si');if(x)choisirSug(+x.dataset.i);});
 }
 
+
+/* ---------- Mon compte : lien public, carnet privé, suppression ---------- */
+var reglages={prive:false},confirmSuppr=0;
+function lienCarnet(){var p=(Store.profil&&Store.profil.pseudo)||'';return location.origin+location.pathname+'?carnet='+encodeURIComponent(p);}
+function ouvrirCompte(){
+  confirmSuppr=0;renderDlgCompte();showDialog($('#compte-dlg'));
+  sb.rpc('bobine_reglages').then(function(r){if(!r.error&&r.data){reglages=r.data;renderDlgCompte();}});
+}
+function renderDlgCompte(){
+  var p=Store.profil||{};
+  $('#cpt-body').innerHTML=
+    '<div class="fld"><span>Le lien de ton carnet</span><div class="datebox"><input id="cpt-lien" readonly value="'+esc(lienCarnet())+'"><button type="button" class="ghost small" data-action="cptcopie">Copier</button></div>'+
+    '<p class="muted petit">'+(reglages.prive?'Ton carnet est privé, ce lien n’affiche rien aux autres.':'Toute personne qui a ce lien peut lire ton carnet. Il n’apparaît nulle part ailleurs.')+'</p></div>'+
+    '<label class="tog large"><input type="checkbox" id="cpt-prive"'+(reglages.prive?' checked':'')+'><span>Carnet privé</span></label>'+
+    '<div class="fld"><span>Tes données</span><p class="muted petit"><a href="#demenager" data-action="close">Exporter tout ton carnet</a><br><a href="#confidentialite" data-action="close">Confidentialité</a></p></div>'+
+    (confirmSuppr===0?'<button type="button" class="ghost danger" data-action="cptsuppr">Supprimer mon carnet</button>':
+     '<div class="confirm">'+(confirmSuppr===1?'Tout ton carnet sera effacé, films, séances, critiques et listes. Ton compte Twitch et tes centimes Kawaze Games ne bougent pas.':'Dernière confirmation, ça ne se rattrape pas.')+
+     ' <button type="button" class="primary small" data-action="cptsuppr">'+(confirmSuppr===1?'Continuer':'Oui, tout effacer')+'</button> <button type="button" class="ghost small" data-action="cptnon">Non</button></div>')+
+    '<div class="df"><button type="button" class="ghost" data-action="logout">Déconnexion</button><span class="sp"></span><button type="button" class="primary" data-action="close">Fermer</button></div>';
+}
+document.addEventListener('change',function(ev){
+  if(ev.target.id!=='cpt-prive')return;
+  var v=ev.target.checked;ev.target.disabled=true;
+  sb.rpc('bobine_rendre_prive',{p_prive:v}).then(function(r){
+    if(r.error){toast('Impossible de changer, réessaie');reglages.prive=!v;}else{reglages.prive=v;toast(v?'Ton carnet est privé':'Ton carnet est public pour qui a le lien');}
+    renderDlgCompte();
+  });
+});
+function actionCompte(act){
+  if(act==='compte')ouvrirCompte();
+  if(act==='cptcopie'){var i=$('#cpt-lien');i.select();(navigator.clipboard?navigator.clipboard.writeText(i.value):Promise.reject()).then(function(){toast('Lien copié');},function(){document.execCommand('copy');toast('Lien copié');});}
+  if(act==='cptnon'){confirmSuppr=0;renderDlgCompte();}
+  if(act==='cptsuppr'){
+    if(confirmSuppr<2){confirmSuppr++;renderDlgCompte();return;}
+    sb.rpc('bobine_supprimer_carnet').then(function(r){
+      if(r.error){toast('La suppression a échoué, réessaie');return;}
+      clearTimeout(Store.timer);S=blank();Store.last=photo();lsSet();importReport='';
+      closeDialog($('#compte-dlg'));render();setStatus('saved');toast('Ton carnet a été supprimé');
+    });
+  }
+}
+function chargerLecture(){
+  if(!sb){LECTEUR.charge=true;render();return;}
+  timeout(sb.rpc('bobine_carnet_public',{p_pseudo:LECTURE}),15000).then(function(r){
+    var d=r&&r.data;LECTEUR.charge=true;
+    if(d&&d.trouve){LECTEUR.trouve=true;LECTEUR.pseudo=d.pseudo;LECTEUR.avatar=d.avatar;S=upgrade(d);document.title='Carnet de '+d.pseudo+', Bobine';}
+    render();
+  },function(){LECTEUR.charge=true;render();});
+}
+
 /* ---------- Rendu ---------- */
 var journalLimit=60,gridLimit=120,fq='',fsort='recent',ffilter='all',openListId=null,confirmWipe=false,listConfirm=false,importReport='';
 
-function route(){var h=location.hash.slice(1);return ROUTES.some(function(r){return r[0]===h;})?h:'journal';}
-function renderTabs(){var r=route();$('#tabs').innerHTML=ROUTES.map(function(x){return '<li><a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+x[1]+'</a></li>';}).join('');}
+function route(){var h=location.hash.slice(1);if(h==='confidentialite')return h;if(LECTURE&&h==='demenager')return 'journal';return ROUTES.some(function(r){return r[0]===h;})?h:'journal';}
+function renderTabs(){var r=route();$('#tabs').innerHTML=ROUTES.filter(function(x){return !(LECTURE&&x[0]==='demenager');}).map(function(x){return '<li><a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+x[1]+'</a></li>';}).join('');}
 function renderAffiche(){
   var films=Object.values(S.films).filter(function(f){return f.w;}).length;
   var rv=S.diary.filter(function(e){return e.rv;}).length;
   var t=screenTime();
-  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche · "+fmtDur(t.total)+' devant l’écran · '+plural(S.diary.length,'séance','séances')+' · '+plural(rv,'critique','critiques');
+  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche, "+fmtDur(t.total)+' devant l’écran, '+plural(S.diary.length,'séance','séances')+', '+plural(rv,'critique','critiques');
 }
 /* Temps devant l'écran : chaque séance compte (revoyures comprises) ; un film vu sans séance datée compte une fois. */
 function screenTime(year){
@@ -282,6 +345,14 @@ function parseDur(s){
 function render(){
   renderTabs();renderAffiche();
   var r=route(),v=$('#view');
+  if(LECTURE&&r!=='manifeste'&&r!=='confidentialite'){
+    var tete='<div class="lecture-tete">'+(LECTEUR.avatar?'<img src="'+esc(LECTEUR.avatar)+'" alt="" width="36" height="36">':'')+'<div><span class="sub">Carnet de</span><b>'+esc(LECTEUR.pseudo||'')+'</b></div><a class="ghost small" href="bobine.html">Ouvrir mon carnet</a></div>';
+    if(!LECTEUR.charge){v.innerHTML=tete+'<p class="muted">Chargement du carnet…</p>';return;}
+    if(!LECTEUR.trouve){v.innerHTML=tete+'<div class="card-box"><h3>Carnet introuvable</h3><p>Ce carnet est privé, ou ce lien ne mène à aucun carnet.</p></div>';return;}
+    v.innerHTML=tete+VIEWS[r]();
+    if(r==='films')fillGrid();
+    return;
+  }
   v.innerHTML=VIEWS[r]();
   if(r==='films')fillGrid();
   if(r==='demenager')wireDrop();
@@ -379,7 +450,7 @@ bilan:function(){
   var st=screenTime(ys),days=st.total/1440;
   var h='<div class="viewhead"><h2>Bilan</h2><p class="sub">tout ton carnet</p></div>'+
     '<section class="clock" aria-label="Compteur d’heures"><span class="lbl">Temps passé devant l’écran</span><span class="big">'+fmtDur(st.total)+'</span>'+
-    '<span class="lbl">depuis ton premier film'+(days>=1?', soit '+days.toFixed(1).replace('.',',')+' jours':'')+(st.unknown?' · durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
+    '<span class="lbl">depuis ton premier film'+(days>=1?', soit '+days.toFixed(1).replace('.',',')+' jours':'')+(st.unknown?', durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
     '<div class="tiles">'+
     tile(fmtN(films.length),'films vus')+tile(fmtN(S.diary.length),'séances')+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>';
   // distribution des notes
@@ -387,12 +458,12 @@ bilan:function(){
   var maxI=dist.indexOf(Math.max.apply(null,dist));
   var labs=['½','1','1½','2','2½','3','3½','4','4½','5'];
   h+='<section class="card-box chart"><h3>Tes notes</h3><p class="cap">'+(rated.length?'Ta note la plus donnée, c’est <b style="color:var(--gold)">'+stars((maxI+1)/2)+'</b>, pour '+plural(dist[maxI],'film','films')+' sur '+fmtN(rated.length)+' notés.':'Aucun film noté pour l’instant.')+'</p>'+
-    bars(dist,labs,dist.map(function(v,i){return stars((i+1)/2)+' · '+plural(v,'film','films');}),'')+'</section>';
+    bars(dist,labs,dist.map(function(v,i){return stars((i+1)/2)+', '+plural(v,'film','films');}),'')+'</section>';
   // mois de l'année
   var mo=[0,0,0,0,0,0,0,0,0,0,0,0];ty.forEach(function(e){var m=+(e.d||'').slice(5,7);if(m)mo[m-1]++;});
   var best=mo.indexOf(Math.max.apply(null,mo));
   h+='<section class="card-box chart"><h3>'+Y+', mois par mois</h3><p class="cap">'+(ty.length?'Ton mois le plus chargé, c’est '+MOIS[best]+' avec '+plural(mo[best],'séance','séances')+'.':'Ajoute la date de visionnage à tes séances pour les voir apparaître mois par mois.')+'</p>'+
-    bars(mo,MOIS_I,mo.map(function(v,i){return MOIS[i]+' · '+plural(v,'séance','séances');}),'acc')+'</section>';
+    bars(mo,MOIS_I,mo.map(function(v,i){return MOIS[i]+', '+plural(v,'séance','séances');}),'acc')+'</section>';
   // décennies
   var dec={};films.forEach(function(f){var y=parseInt(f.y,10);if(y>1870&&y<2100){var d=Math.floor(y/10)*10;dec[d]=(dec[d]||0)+1;}});
   var ks=Object.keys(dec).sort();
@@ -434,9 +505,24 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Compteur d’heures passées devant l’écran</span></div>'+
   '<div><span class="st ok">Fait</span><span>Connexion avec Twitch, carnet enregistré sur ton compte</span></div>'+
   '<div><span class="st ok">Fait</span><span>Vraies affiches, durées et réalisateurs grâce à TMDB</span></div>'+
-  '<div><span class="st">Ensuite</span><span>Profils publics, amis, fil d’activité</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Carnets publics avec un lien, carnet privé en un clic</span></div>'+
+  '<div><span class="st">Ensuite</span><span>Mode salle obscure, ticket qui se détache, spoilers floutés</span></div>'+
+  '<div><span class="st">Ensuite</span><span>Bilan en story, défis et succès, roulette À voir</span></div>'+
   '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
+  '</div></section>'+
+  '<section class="card-box" id="nouveautes"><h3>Nouveautés</h3><div class="roadmap">'+
+  NOUVEAUTES.map(function(n){return '<div><span class="st ok">v'+n[0]+'</span><span>'+esc(n[1])+'</span></div>';}).join('')+
   '</div></section></article>';
+},
+confidentialite:function(){
+  return '<article class="manifesto"><div class="viewhead"><h2>Confidentialité</h2></div>'+
+  '<p class="lead">Bobine garde le strict nécessaire, et tu peux tout reprendre ou tout effacer quand tu veux.</p>'+
+  '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, écris à Kawaze en message privé sur Twitch.</p></section>'+
+  '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
+  '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Ton carnet est public, mais seulement pour qui a son lien. Il n’y a pas d’annuaire des membres, pas de recherche de profils et pas de référencement sur Google.</p><p>Tu peux le passer en privé à tout moment depuis ton compte. Un carnet privé n’est plus visible par personne d’autre que toi.</p></section>'+
+  '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
+  '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement, depuis ton compte. Pour effacer aussi ton compte Twitch relié, écris à Kawaze.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
+  '</article>';
 }
 };
 
@@ -529,7 +615,7 @@ function buildCard(e){
   x.textBaseline='alphabetic';
   /* en-tête, sous la zone du profil */
   x.fillStyle=ink;x.font='900 64px '+disp;x.textAlign='left';x.fillText('BOBINE',M,318);
-  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv?'CRITIQUE':'SÉANCE')+(e.d?' · '+fmtDate(e.d).toUpperCase():''),W-M,312);
+  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv?'CRITIQUE':'SÉANCE')+(e.d?'  '+fmtDate(e.d).toUpperCase():''),W-M,312);
   /* affiche */
   var pw=420,ph=630,py=350;drawPoster(x,f,(W-pw)/2,py,pw,ph);
   /* titre sous l'affiche, toujours */
@@ -540,7 +626,7 @@ function buildCard(e){
     y+=86;tl.forEach(function(l,i){x.fillText(l,W/2,y+i*(ts+2));});
     y+=(tl.length-1)*(ts+2)+46;
   }
-  var info=[f.y,f.m?fmtDurShort(f.m):''].filter(Boolean).join(' · ');
+  var info=[f.y,f.m?fmtDurShort(f.m):''].filter(Boolean).join('   ');
   if(info){x.font='500 28px '+mono;x.fillStyle=grey;x.fillText(info,W/2,y);}else y-=40;
   /* étoiles + cœur sur une ligne */
   y+=96;
@@ -712,7 +798,7 @@ function renderSheet(){
    '<form class="fld" id="sh-dur" autocomplete="off"><span>Durée</span><div class="durrow"><input name="m" value="'+esc(fmtDurShort(f.m))+'" placeholder="1h30" aria-label="Durée du film"><button class="ghost small" type="submit">Enregistrer</button></div></form>'+
    '<button class="primary" type="button" data-action="logk">+ Ajouter une séance</button>'+
    (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
-   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?' · revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
+   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?', revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
    (sheetConfirm?'<div class="confirm">Retirer ce film et ses séances du carnet ? <button class="primary small" type="button" data-action="fkill">Oui, retirer</button><button class="ghost small" type="button" data-action="fnokill">Non</button></div>':'<div><button class="ghost danger small" type="button" data-action="faskkill">Retirer du carnet</button></div>')+
    '</div>';
   picker($('#sh-r'),f.r||0,function(v){f.r=v||null;f.w=true;commit();});
@@ -825,6 +911,7 @@ function telecharger(blob,name){
 function addFromForm(form){var p=splitTitle(form.t.value,form.y.value.trim());if(!p[0])return null;if(p[1]&&!/^\d{4}$/.test(p[1])){toast('L’année s’écrit avec 4 chiffres');return null;}return ensureFilm(p[0],p[1]);}
 document.addEventListener('submit',function(ev){
   var f=ev.target;
+  if(LECTURE){ev.preventDefault();return;}
   if(f.id==='sh-dur'||f.classList.contains('mrow')){
     ev.preventDefault();
     var fk=f.id==='sh-dur'?film(sheetK):film(f.dataset.k),v=parseDur(f.m.value);
@@ -847,11 +934,18 @@ document.addEventListener('change',function(ev){
   if(ev.target.id==='fsort'){fsort=ev.target.value;fillGrid();}
 });
 document.addEventListener('keydown',function(ev){
-  if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('article.ticket[data-action]')){ev.preventDefault();openLog({id:ev.target.dataset.id});}
+  if(!LECTURE&&(ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('article.ticket[data-action]')){ev.preventDefault();openLog({id:ev.target.dataset.id});}
 });
+document.addEventListener('click',function(ev){
+  if(!ev.target.closest('#version'))return;
+  ev.preventDefault();location.hash='#manifeste';
+  setTimeout(function(){var n=$('#nouveautes');if(n)n.scrollIntoView({behavior:'smooth',block:'start'});},150);
+});
+var EN_LECTURE={close:1,more:1,gmore:1,ffilter:1,sheet:1,lopen:1,lback:1,compte:1};
 document.addEventListener('click',function(ev){
   var a=ev.target.closest('[data-action]');if(!a)return;
   var act=a.dataset.action,L;
+  if(LECTURE&&!EN_LECTURE[act])return;
   switch(act){
     case 'log':openLog();break;
     case 'edit':openLog({id:a.dataset.id});break;
@@ -890,15 +984,22 @@ document.addEventListener('click',function(ev){
     case 'nowipe':confirmWipe=false;render();break;
     case 'wipe':var keep=S.updatedAt;S=blank();S.updatedAt=keep;confirmWipe=false;importReport='';commit();toast('Carnet effacé');break;
     case 'login':seConnecter();break;
-    case 'logout':seDeconnecter();break;
+    case 'logout':closeDialog($('#compte-dlg'));seDeconnecter();break;
+    case 'compte':case 'cptcopie':case 'cptsuppr':case 'cptnon':actionCompte(act);break;
   }
 });
 window.addEventListener('beforeunload',function(ev){if(Store.mode==='db'&&(Store.saving||$('#sync').dataset.s==='pending')){flush();ev.preventDefault();ev.returnValue='';}});
 window.addEventListener('hashchange',function(){if(route()!=='listes')openListId=null;confirmWipe=false;render();window.scrollTo(0,0);});
 
 /* ---------- Démarrage ---------- */
-var cached=lsGet(LS);if(cached)S=upgrade(cached);
-render();renderCompte();brancherSug();
-connect();
-if(!sb)setTimeout(rattraper,1500);
+$('#version').textContent='v'+VERSION;
+if(LECTURE){
+  document.body.classList.add('lecture');$('#sync').style.display='none';
+  render();renderCompte();chargerLecture();
+}else{
+  var cached=lsGet(LS);if(cached)S=upgrade(cached);
+  render();renderCompte();brancherSug();
+  connect();
+  if(!sb)setTimeout(rattraper,1500);
+}
 })();

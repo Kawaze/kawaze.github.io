@@ -290,7 +290,7 @@ dialog::backdrop{background:rgba(5,5,8,.6)}
 .cbtn.twitch{background:#9146ff;border-color:#9146ff;color:#fff}
 .cbtn:hover{border-color:var(--bulb)}
 .invite{font-size:14px;color:var(--muted);border-left:3px solid #9146ff;padding:4px 0 4px 10px;margin:-8px 0 20px!important}
-@media (max-width:420px){.mq-top>span:first-child{display:none}.mq-top{justify-content:flex-end}}
+@media (max-width:420px){.mq-top .cc{display:none}.mq-top .version{margin-left:0}}
 
 /* ===== TMDB : vraies affiches, suggestions, crédits ===== */
 .poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;border-radius:inherit}
@@ -319,3 +319,26 @@ dialog::backdrop{background:rgba(5,5,8,.6)}
 .datebox input{flex:1}
 .stub.nodate .mon{font:800 18px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #lf-d-box[hidden],#lf-d-add[hidden]{display:none!important}
+
+/* ===== 1.4 : version, compte, lecture d'un carnet, confidentialité ===== */
+.version{color:var(--bulb);text-decoration:none;margin-left:6px;letter-spacing:.08em}
+.version:hover{text-decoration:underline}
+.cbtn.moi{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;text-transform:none}
+.cbtn.moi img{width:22px;height:22px;border-radius:50%;object-fit:cover}
+a.cbtn{text-decoration:none;display:inline-flex;align-items:center}
+.petit{font-size:13px;margin:6px 0 0}
+.tog.large{align-self:flex-start}
+#cpt-body{display:flex;flex-direction:column;gap:14px}
+#cpt-body .df{margin-top:6px}
+#cpt-lien{font:500 13px/1.3 var(--mono)}
+.lecture-tete{display:flex;align-items:center;gap:12px;margin:4px 0 18px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.lecture-tete img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+.lecture-tete div{display:flex;flex-direction:column;line-height:1.2;flex:1;min-width:0}
+.lecture-tete b{font:800 22px/1.1 var(--display);text-transform:uppercase;overflow:hidden;text-overflow:ellipsis}
+.lecture-tete .sub{font:500 11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+.lecture-tete a{text-decoration:none;color:var(--ink)}
+body.lecture .fab,body.lecture .card-actions,body.lecture #view .acts,body.lecture #lform,body.lecture #liform,body.lecture #wlform,
+body.lecture #sheet-body button:not(.x),body.lecture #sheet-body form,body.lecture #sheet-body select,body.lecture .hello .actions,body.lecture .invite{display:none!important}
+body.lecture .ticket{cursor:default}
+.credits .liens{margin-left:auto}
+#cpt-body a{color:var(--ink)}
