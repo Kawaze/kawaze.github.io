@@ -235,6 +235,7 @@ function brancherSug(){
   t.removeAttribute('list');
   t.addEventListener('input',function(){
     if(logCtx)logCtx.tmdb=null;
+    $('#lf-y').value='';$('#lf-m').value=''; /* année et durée viennent du film choisi */
     var q=t.value.trim();clearTimeout(sugTimer);
     if(q.length<2){fermerSug();return;}
     sugTimer=setTimeout(function(){chercherSug(q);},250);
@@ -262,7 +263,7 @@ function renderAffiche(){
   var ty=S.diary.filter(function(e){return (e.d||'').slice(0,4)===y;}).length;
   var rv=S.diary.filter(function(e){return e.rv;}).length;
   var t=screenTime();
-  $('#affiche').textContent="À l'affiche : "+plural(films,'film','films')+' · '+fmtDur(t.total)+' devant l’écran · '+plural(ty,'séance','séances')+' en '+y+' · '+plural(rv,'critique','critiques');
+  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche · "+fmtDur(t.total)+' devant l’écran · '+plural(ty,'séance','séances')+' en '+y+' · '+plural(rv,'critique','critiques');
 }
 /* Temps devant l'écran : chaque séance compte (revoyures comprises) ; un film vu sans séance datée compte une fois. */
 function screenTime(year){
@@ -296,7 +297,7 @@ function poster(f,cls){
 }
 function ticket(e,f,example){
   var p=(e.d||'').split('-');
-  var attrs=example?'':' data-action="edit" data-id="'+esc(e.id)+'" tabindex="0" role="button" aria-label="Modifier la séance : '+esc(f.t)+'"';
+  var attrs=example?'':' data-action="edit" data-id="'+esc(e.id)+'" tabindex="0" role="button" aria-label="Modifier la séance de '+esc(f.t)+'"';
   return '<article class="ticket'+(example?' example':'')+'"'+attrs+'>'+
     '<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>'+
     '<div class="tbody"><h4>'+esc(f.t)+' <span class="fy">'+esc(f.y)+'</span></h4>'+
@@ -387,12 +388,12 @@ bilan:function(){
   var dist=[0,0,0,0,0,0,0,0,0,0];rated.forEach(function(f){var i=Math.round(f.r*2)-1;if(i>=0&&i<10)dist[i]++;});
   var maxI=dist.indexOf(Math.max.apply(null,dist));
   var labs=['½','1','1½','2','2½','3','3½','4','4½','5'];
-  h+='<section class="card-box chart"><h3>Tes notes</h3><p class="cap">'+(rated.length?'Ta note la plus donnée : <b style="color:var(--gold)">'+stars((maxI+1)/2)+'</b>, '+plural(dist[maxI],'film','films')+' sur '+fmtN(rated.length)+' notés.':'Aucun film noté pour l’instant.')+'</p>'+
+  h+='<section class="card-box chart"><h3>Tes notes</h3><p class="cap">'+(rated.length?'Ta note la plus donnée, c’est <b style="color:var(--gold)">'+stars((maxI+1)/2)+'</b>, pour '+plural(dist[maxI],'film','films')+' sur '+fmtN(rated.length)+' notés.':'Aucun film noté pour l’instant.')+'</p>'+
     bars(dist,labs,dist.map(function(v,i){return stars((i+1)/2)+' · '+plural(v,'film','films');}),'')+'</section>';
   // mois de l'année
   var mo=[0,0,0,0,0,0,0,0,0,0,0,0];ty.forEach(function(e){var m=+(e.d||'').slice(5,7);if(m)mo[m-1]++;});
   var best=mo.indexOf(Math.max.apply(null,mo));
-  h+='<section class="card-box chart"><h3>'+Y+', mois par mois</h3><p class="cap">'+(ty.length?'Ton mois le plus chargé : '+MOIS[best]+', '+plural(mo[best],'séance','séances')+'.':'Pas encore de séance datée en '+Y+'.')+'</p>'+
+  h+='<section class="card-box chart"><h3>'+Y+', mois par mois</h3><p class="cap">'+(ty.length?'Ton mois le plus chargé, c’est '+MOIS[best]+' avec '+plural(mo[best],'séance','séances')+'.':'Pas encore de séance datée en '+Y+'.')+'</p>'+
     bars(mo,MOIS_I,mo.map(function(v,i){return MOIS[i]+' · '+plural(v,'séance','séances');}),'acc')+'</section>';
   // décennies
   var dec={};films.forEach(function(f){var y=parseInt(f.y,10);if(y>1870&&y<2100){var d=Math.floor(y/10)*10;dec[d]=(dec[d]||0)+1;}});
@@ -411,7 +412,7 @@ bilan:function(){
 demenager:function(){
   return '<div class="viewhead"><h2>Déménager</h2><p class="sub">tes données, ton carnet</p></div>'+
    '<section class="card-box"><h3>Arriver depuis Letterboxd</h3>'+
-   '<ol class="steps"><li>Sur le site letterboxd.com (pas l’appli) : <b>Settings → Data → Export your data</b>.</li><li>Tu récupères un fichier <b>.zip</b>.</li><li>Dépose-le ici tel quel. Journal, notes, critiques, coups de cœur, watchlist et listes arrivent d’un coup. Le fichier est lu dans ton navigateur, seul ton carnet est enregistré.</li></ol>'+
+   '<ol class="steps"><li>Sur le site letterboxd.com (pas l’appli), va dans <b>Settings → Data → Export your data</b>.</li><li>Tu récupères un fichier <b>.zip</b>.</li><li>Dépose-le ici tel quel. Journal, notes, critiques, coups de cœur, watchlist et listes arrivent d’un coup. Le fichier est lu dans ton navigateur, seul ton carnet est enregistré.</li></ol>'+
    '<label class="drop" id="drop"><input type="file" id="imp" accept=".zip,.csv,.json,application/zip,text/csv,application/json" multiple><span class="dt">Choisir le .zip</span><span class="ds">ou des fichiers .csv, ou un carnet Bobine .json, ou glisse-les ici</span></label>'+
    '<div id="impres" aria-live="polite">'+importReport+'</div></section>'+
    '<section class="card-box"><h3>Repartir quand tu veux</h3><p>Ton carnet entier, à tout moment. Le CSV se réimporte dans Letterboxd et dans la plupart des autres sites.</p>'+
@@ -421,7 +422,7 @@ demenager:function(){
 },
 manifeste:function(){
   return '<article class="manif"><h2>Bobine ne sera jamais à vendre.</h2>'+
-  '<p class="lead">Letterboxd est en train de changer de mains pour 330 millions de dollars. Ce n’est pas un drame, c’est un rappel : une communauté qui appartient à quelqu’un d’autre peut toujours être vendue. Bobine part de l’idée inverse.</p>'+
+  '<p class="lead">Letterboxd est en train de changer de mains pour 330 millions de dollars. Ce n’est pas un drame, c’est un rappel. Une communauté qui appartient à quelqu’un d’autre peut toujours être vendue. Bobine part de l’idée inverse.</p>'+
   '<ol>'+
   '<li><div><b>Ses membres en sont propriétaires</b><p>Une coopérative ou une association, une personne égale une voix. Pas d’actionnaire à rembourser, donc rien à revendre.</p></div></li>'+
   '<li><div><b>Tes données sortent en un clic</b><p>Export complet, quand tu veux, dans un format que Letterboxd et les autres savent lire. Partir doit être aussi simple qu’arriver.</p></div></li>'+
@@ -430,13 +431,13 @@ manifeste:function(){
   '<li><div><b>Le cinéma d’abord</b><p>La salle, les ciné-clubs, la critique longue autant que la vanne en une ligne.</p></div></li>'+
   '</ol>'+
   '<section class="card-box"><h3>Où on en est</h3><div class="roadmap">'+
-  '<div><span class="st ok">Fait</span><span>Carnet perso : journal, notes au demi-point, critiques, listes, à voir, bilan</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Carnet perso avec journal, notes au demi-point, critiques, listes, à voir et bilan</span></div>'+
   '<div><span class="st ok">Fait</span><span>Import Letterboxd complet, export CSV et JSON</span></div>'+
   '<div><span class="st ok">Fait</span><span>Compteur d’heures passées devant l’écran</span></div>'+
   '<div><span class="st ok">Fait</span><span>Connexion avec Twitch, carnet enregistré sur ton compte</span></div>'+
   '<div><span class="st ok">Fait</span><span>Vraies affiches, durées et réalisateurs grâce à TMDB</span></div>'+
   '<div><span class="st">Ensuite</span><span>Profils publics, amis, fil d’activité</span></div>'+
-  '<div><span class="st">Plus tard</span><span>Fédération : ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
+  '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
   '</div></section></article>';
 }
 };
@@ -586,7 +587,7 @@ function renderShare(){
   shareCtx.blob=null;cv.toBlob(function(b){shareCtx.blob=b;},'image/png');
 }
 function openShare(id){
-  shareCtx.id=id;$('#sh-msg').textContent='Sur téléphone, l’image s’ouvre dans le menu de partage : choisis Instagram, puis Story.';
+  shareCtx.id=id;$('#sh-msg').textContent='Sur téléphone, l’image s’ouvre dans le menu de partage. Choisis Instagram, puis Story.';
   closeDialog($('#log'));closeDialog($('#sheet'));showDialog($('#share'));
   var fonts=['900 86px "Big Shoulders Display"','800 60px "Big Shoulders Display"','500 40px "Instrument Sans"','500 28px "IBM Plex Mono"'];
   var ready=(document.fonts&&document.fonts.load)?Promise.all(fonts.map(function(s){return document.fonts.load(s).catch(function(){});})):Promise.resolve();
@@ -609,7 +610,7 @@ function doShare(){
 }
 function saveFile(blob,name){
   telecharger(blob,name);
-  $('#sh-msg').textContent='Image enregistrée. Dans Instagram : nouvelle story, choisis l’image, ajoute le sticker Lien en bas.';
+  $('#sh-msg').textContent='Image enregistrée. Dans Instagram, crée une story, choisis l’image et ajoute le sticker Lien en bas.';
 }
 function copyCaption(){
   var e=S.diary.find(function(x){return x.id===shareCtx.id;});if(!e)return;
@@ -681,6 +682,7 @@ $('#logform').addEventListener('submit',function(ev){
   var d=$('#lf-d').value||today(),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim();
   var tm=logCtx.tmdb&&logCtx.tmdb.t===t&&logCtx.tmdb.y===y?logCtx.tmdb:null,f=null;
   if(tm)f=Object.values(S.films).find(function(x){return x.tm===tm.id;})||null;
+  if(!f&&!tm&&!y){var memes=Object.values(S.films).filter(function(x){return norm(x.t)===norm(t);});if(memes.length===1)f=memes[0];}
   if(!f)f=ensureFilm(t,y);
   if(tm){f.tm=tm.id;if(tm.p)f.p=tm.p;if(tm.dr)f.dr=tm.dr;if(!mm&&tm.m&&!f.m)f.m=tm.m;}
   f.w=true;f.wl=null;if(r)f.r=r;if(l)f.l=true;if(mm)f.m=mm;
@@ -705,7 +707,7 @@ function renderSheet(){
    '<div class="dbody"><div class="fld"><span id="sh-r-l">Ta note</span><div id="sh-r" class="picker" role="slider" tabindex="0" aria-labelledby="sh-r-l" aria-valuemin="0" aria-valuemax="5"></div></div>'+
    '<form class="fld" id="sh-dur" autocomplete="off"><span>Durée</span><div class="durrow"><input name="m" value="'+esc(fmtDurShort(f.m))+'" placeholder="1h30" aria-label="Durée du film"><button class="ghost small" type="submit">Enregistrer</button></div></form>'+
    '<button class="primary" type="button" data-action="logk">+ Ajouter une séance</button>'+
-   (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans : '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
+   (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
    '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+fmtDate(e.d)+(e.rw?' · revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Vu sans date. Ajoute une séance pour le faire entrer dans ton journal.</p>')+'</div>'+
    (sheetConfirm?'<div class="confirm">Retirer ce film et ses séances du carnet ? <button class="primary small" type="button" data-action="fkill">Oui, retirer</button><button class="ghost small" type="button" data-action="fnokill">Non</button></div>':'<div><button class="ghost danger small" type="button" data-action="faskkill">Retirer du carnet</button></div>')+
    '</div>';
@@ -736,7 +738,7 @@ function importFiles(files){
     }
     var rep=mergeLB(texts);
     if(!rep){importReport='<div class="report"><b>Rien à importer.</b> Ce fichier ne ressemble pas à un export Letterboxd. Il faut le .zip téléchargé depuis Settings → Data, ou les fichiers diary.csv, ratings.csv, watched.csv qu’il contient.</div>';render();return;}
-    importReport='<div class="report"><b>Bienvenue chez toi.</b> Import terminé :<ul>'+rep+'</ul></div>';
+    importReport='<div class="report"><b>Bienvenue chez toi.</b> Import terminé.<ul>'+rep+'</ul></div>';
     commit();toast('Import terminé');setTimeout(rattraper,800);
   }).catch(function(){res.innerHTML='<div class="report">Impossible de lire ce fichier. Vérifie que c’est bien le .zip d’export Letterboxd, sans le renommer.</div>';});
 }
@@ -826,7 +828,7 @@ document.addEventListener('submit',function(ev){
     if(v<0||v>1500){toast('Écris par exemple 1h20, 80 ou 1:20');f.m.focus();return;}
     fk.m=v||null;commit();
     if(f.id==='sh-dur')renderSheet();
-    toast(v?'Durée enregistrée : '+fmtDurShort(v):'Durée effacée');
+    toast(v?'Durée de '+fmtDurShort(v)+' enregistrée':'Durée effacée');
     if(f.id!=='sh-dur')setTimeout(function(){var i=$('.mrow input');if(i)i.focus();},0);
     return;
   }
