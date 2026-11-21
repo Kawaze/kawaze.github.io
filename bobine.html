@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="bobine.css?v=3">
+<link rel="stylesheet" href="bobine.css?v=4">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -19,7 +19,7 @@
     <div class="mq-top"><span>Carnet ciné · bêta</span><span class="droite"><span class="chip" id="sync" data-s="local" role="status"><i></i><span>Sur cet appareil</span></span><span class="compte" id="compte"></span></span></div>
     <h1 class="logo" aria-label="Bobine"><span>B</span><span>o</span><span>b</span><span>i</span><span>n</span><span>e</span></h1>
     <p class="tagline" style="margin:0">Le carnet ciné qui ne sera jamais à vendre</p>
-    <p class="affiche" id="affiche" style="margin:4px 0 0">0 film à l'affiche · 0 séance cette année · 0 critique</p>
+    <p class="affiche" id="affiche" style="margin:4px 0 0">0 film à l'affiche · 0 séance · 0 critique</p>
   </div>
   <div class="bulbs b" aria-hidden="true"></div>
 </header>
@@ -39,7 +39,8 @@
     <div class="dbody">
       <div class="fld-sug"><label class="fld"><span>Titre</span><input id="lf-t" name="t" list="known" autocomplete="off" placeholder="Tape le début du titre" aria-controls="lf-sug"></label><div class="sug" id="lf-sug" role="listbox" hidden></div></div>
       <input type="hidden" id="lf-y" name="y"><input type="hidden" id="lf-m" name="m">
-      <label class="fld"><span>Vu le</span><input id="lf-d" type="date" name="d"></label>
+      <button type="button" class="adddate" id="lf-d-add">+ Ajouter la date de visionnage</button>
+      <div class="fld" id="lf-d-box" hidden><span>Vu le</span><div class="datebox"><input id="lf-d" type="date" name="d" aria-label="Date de visionnage"><button type="button" class="ghost small" id="lf-d-del" aria-label="Retirer la date">Retirer</button></div></div>
       <div class="fld"><span id="lf-r-l">Note</span><div id="lf-r" class="picker" role="slider" tabindex="0" aria-labelledby="lf-r-l" aria-valuemin="0" aria-valuemax="5"></div></div>
       <div class="toggles">
         <label class="tog"><input type="checkbox" id="lf-l"><span>♥ Coup de cœur</span></label>
@@ -79,6 +80,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
 <script src="paris-config.js?v=8"></script>
-<script src="bobine.js?v=3"></script>
+<script src="bobine.js?v=4"></script>
 </body>
 </html>

@@ -20,7 +20,7 @@ function plural(n,one,many){return fmtN(n)+' '+(n>1?many:one);}
 function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function stars(r){if(!r)return '';var f=Math.floor(r);return '★'.repeat(f)+(r-f>=0.5?'½':'');}
 function ratingWords(r){return r?String(r).replace('.',',')+' sur 5':'sans note';}
-function monthLabel(ym){var p=ym.split('-');if(!p[1])return 'Date inconnue';return MOIS[+p[1]-1]+' '+p[0];}
+function monthLabel(ym){var p=ym.split('-');if(!p[1])return 'Vus';return MOIS[+p[1]-1]+' '+p[0];}
 function fmtDate(d){if(!d)return '';var p=d.split('-');return +p[2]+' '+MOIS[+p[1]-1]+' '+p[0];}
 
 /* ---------- État ---------- */
@@ -259,11 +259,9 @@ function route(){var h=location.hash.slice(1);return ROUTES.some(function(r){ret
 function renderTabs(){var r=route();$('#tabs').innerHTML=ROUTES.map(function(x){return '<li><a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+x[1]+'</a></li>';}).join('');}
 function renderAffiche(){
   var films=Object.values(S.films).filter(function(f){return f.w;}).length;
-  var y=String(new Date().getFullYear());
-  var ty=S.diary.filter(function(e){return (e.d||'').slice(0,4)===y;}).length;
   var rv=S.diary.filter(function(e){return e.rv;}).length;
   var t=screenTime();
-  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche · "+fmtDur(t.total)+' devant l’écran · '+plural(ty,'séance','séances')+' en '+y+' · '+plural(rv,'critique','critiques');
+  $('#affiche').textContent=plural(films,'film','films')+" à l'affiche · "+fmtDur(t.total)+' devant l’écran · '+plural(S.diary.length,'séance','séances')+' · '+plural(rv,'critique','critiques');
 }
 /* Temps devant l'écran : chaque séance compte (revoyures comprises) ; un film vu sans séance datée compte une fois. */
 function screenTime(year){
@@ -299,7 +297,7 @@ function ticket(e,f,example){
   var p=(e.d||'').split('-');
   var attrs=example?'':' data-action="edit" data-id="'+esc(e.id)+'" tabindex="0" role="button" aria-label="Modifier la séance de '+esc(f.t)+'"';
   return '<article class="ticket'+(example?' example':'')+'"'+attrs+'>'+
-    '<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>'+
+    (e.d?'<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>':'<div class="stub nodate"><span class="mon">vu</span></div>')+
     '<div class="tbody"><h4>'+esc(f.t)+' <span class="fy">'+esc(f.y)+'</span></h4>'+
     '<div class="meta">'+(e.r?'<span class="stars" aria-label="'+ratingWords(e.r)+'">'+stars(e.r)+'</span>':'')+(e.l?'<span class="heart" aria-label="Coup de cœur">♥</span>':'')+(e.rw?'<span class="tag">revu</span>':'')+((f.m||e.m)?'<span class="dur-tag">'+fmtDurShort(f.m||e.m)+'</span>':'')+(example?'<span class="tag ex">exemple</span>':'')+'</div>'+
     (e.rv?'<p class="rv">'+esc(e.rv)+'</p>':'')+'</div>'+poster(f,'mini')+'</article>';
@@ -311,7 +309,7 @@ journal:function(){
     var ex1={k:'ex1',t:'Les Glaneurs et la Glaneuse',y:'2000'},ex2={k:'ex2',t:'Paris, Texas',y:'1984'};
     var anyFilms=Object.keys(S.films).length;
     return '<section class="hello"><h2>Ton carnet est vide.</h2>'+
-      '<p>'+(anyFilms?'Tes films sont là, mais ton journal n’a pas encore de séance datée. Note ta prochaine sortie ciné.':'Ramène tout ton historique Letterboxd en une fois, ou commence par le dernier film que tu as vu. Tout reste à toi et sort en un clic.')+'</p>'+
+      '<p>'+(anyFilms?'Tes films sont là, mais ton journal est encore vide. Note le prochain film que tu regardes.':'Ramène tout ton historique Letterboxd en une fois, ou commence par le dernier film que tu as vu. Tout reste à toi et sort en un clic.')+'</p>'+
       '<div class="actions"><button class="primary" type="button" data-action="log">Noter un film</button><a class="ghost" href="#demenager">Déménager depuis Letterboxd</a></div>'+
       (sb&&Store.mode!=='db'?'<p class="invite">Connecte-toi avec Twitch pour retrouver ton carnet sur tous tes appareils. Sans compte, il reste sur cet appareil.</p>':'')+
       '<h3 class="month">Aperçu</h3>'+
@@ -381,9 +379,9 @@ bilan:function(){
   var st=screenTime(ys),days=st.total/1440;
   var h='<div class="viewhead"><h2>Bilan</h2><p class="sub">tout ton carnet</p></div>'+
     '<section class="clock" aria-label="Compteur d’heures"><span class="lbl">Temps passé devant l’écran</span><span class="big">'+fmtDur(st.total)+'</span>'+
-    '<span class="lbl">'+(days>=1?'soit '+days.toFixed(1).replace('.',',')+' jours · ':'')+fmtDur(st.year)+' en '+Y+(st.unknown?' · durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
+    '<span class="lbl">depuis ton premier film'+(days>=1?', soit '+days.toFixed(1).replace('.',',')+' jours':'')+(st.unknown?' · durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
     '<div class="tiles">'+
-    tile(fmtN(films.length),'films vus')+tile(fmtN(ty.length),'séances en '+Y)+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>';
+    tile(fmtN(films.length),'films vus')+tile(fmtN(S.diary.length),'séances')+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>';
   // distribution des notes
   var dist=[0,0,0,0,0,0,0,0,0,0];rated.forEach(function(f){var i=Math.round(f.r*2)-1;if(i>=0&&i<10)dist[i]++;});
   var maxI=dist.indexOf(Math.max.apply(null,dist));
@@ -393,7 +391,7 @@ bilan:function(){
   // mois de l'année
   var mo=[0,0,0,0,0,0,0,0,0,0,0,0];ty.forEach(function(e){var m=+(e.d||'').slice(5,7);if(m)mo[m-1]++;});
   var best=mo.indexOf(Math.max.apply(null,mo));
-  h+='<section class="card-box chart"><h3>'+Y+', mois par mois</h3><p class="cap">'+(ty.length?'Ton mois le plus chargé, c’est '+MOIS[best]+' avec '+plural(mo[best],'séance','séances')+'.':'Pas encore de séance datée en '+Y+'.')+'</p>'+
+  h+='<section class="card-box chart"><h3>'+Y+', mois par mois</h3><p class="cap">'+(ty.length?'Ton mois le plus chargé, c’est '+MOIS[best]+' avec '+plural(mo[best],'séance','séances')+'.':'Ajoute la date de visionnage à tes séances pour les voir apparaître mois par mois.')+'</p>'+
     bars(mo,MOIS_I,mo.map(function(v,i){return MOIS[i]+' · '+plural(v,'séance','séances');}),'acc')+'</section>';
   // décennies
   var dec={};films.forEach(function(f){var y=parseInt(f.y,10);if(y>1870&&y<2100){var d=Math.floor(y/10)*10;dec[d]=(dec[d]||0)+1;}});
@@ -531,7 +529,7 @@ function buildCard(e){
   x.textBaseline='alphabetic';
   /* en-tête, sous la zone du profil */
   x.fillStyle=ink;x.font='900 64px '+disp;x.textAlign='left';x.fillText('BOBINE',M,318);
-  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv?'CRITIQUE':'SÉANCE')+' · '+fmtDate(e.d).toUpperCase(),W-M,312);
+  x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv?'CRITIQUE':'SÉANCE')+(e.d?' · '+fmtDate(e.d).toUpperCase():''),W-M,312);
   /* affiche */
   var pw=420,ph=630,py=350;drawPoster(x,f,(W-pw)/2,py,pw,ph);
   /* titre sous l'affiche, toujours */
@@ -650,6 +648,12 @@ function picker(el,val,onChange){
 var logCtx={},getRating=function(){return 0;};
 function showDialog(d){try{d.showModal();}catch(e){d.setAttribute('open','');}}
 function closeDialog(d){try{d.close();}catch(e){d.removeAttribute('open');}}
+function montrerDate(oui){
+  $('#lf-d-box').hidden=!oui;$('#lf-d-add').hidden=oui;
+  if(oui&&!$('#lf-d').value)$('#lf-d').value=today();
+}
+$('#lf-d-add').addEventListener('click',function(){montrerDate(true);$('#lf-d').focus();});
+$('#lf-d-del').addEventListener('click',function(){$('#lf-d').value='';montrerDate(false);});
 function openLog(o){
   o=o||{};
   var e=o.id?S.diary.find(function(x){return x.id===o.id;}):null;
@@ -657,7 +661,7 @@ function openLog(o){
   logCtx={id:e?e.id:null};
   $('#log-title').textContent=e?'Modifier la séance':'Noter un film';
   $('#lf-t').value=f?f.t:'';$('#lf-y').value=f?f.y:'';
-  $('#lf-d').value=e?(e.d||today()):today();
+  $('#lf-d').value=e?(e.d||''):'';montrerDate(!!(e&&e.d));
   $('#lf-m').value=f&&f.m?fmtDurShort(f.m):'';
   $('#lf-l').checked=e?!!e.l:!!(f&&f.l);
   $('#lf-rw').checked=e?!!e.rw:!!(f&&S.diary.some(function(x){return x.k===f.k;}));
@@ -679,7 +683,7 @@ $('#logform').addEventListener('submit',function(ev){
   if(y&&!/^\d{4}$/.test(y)){err.textContent='L’année s’écrit avec 4 chiffres, par exemple 1984.';$('#lf-y').focus();return;}
   var mm=parseDur($('#lf-m').value);
   if(mm<0||mm>1500){err.textContent='Durée non comprise. Écris par exemple 1h20, 80 ou 1:20.';$('#lf-m').focus();return;}
-  var d=$('#lf-d').value||today(),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim();
+  var d=$('#lf-d-box').hidden?'':($('#lf-d').value||''),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim();
   var tm=logCtx.tmdb&&logCtx.tmdb.t===t&&logCtx.tmdb.y===y?logCtx.tmdb:null,f=null;
   if(tm)f=Object.values(S.films).find(function(x){return x.tm===tm.id;})||null;
   if(!f&&!tm&&!y){var memes=Object.values(S.films).filter(function(x){return norm(x.t)===norm(t);});if(memes.length===1)f=memes[0];}
@@ -708,7 +712,7 @@ function renderSheet(){
    '<form class="fld" id="sh-dur" autocomplete="off"><span>Durée</span><div class="durrow"><input name="m" value="'+esc(fmtDurShort(f.m))+'" placeholder="1h30" aria-label="Durée du film"><button class="ghost small" type="submit">Enregistrer</button></div></form>'+
    '<button class="primary" type="button" data-action="logk">+ Ajouter une séance</button>'+
    (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
-   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+fmtDate(e.d)+(e.rw?' · revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Vu sans date. Ajoute une séance pour le faire entrer dans ton journal.</p>')+'</div>'+
+   '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?' · revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?'<p>'+esc(e.rv)+'</p>':'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
    (sheetConfirm?'<div class="confirm">Retirer ce film et ses séances du carnet ? <button class="primary small" type="button" data-action="fkill">Oui, retirer</button><button class="ghost small" type="button" data-action="fnokill">Non</button></div>':'<div><button class="ghost danger small" type="button" data-action="faskkill">Retirer du carnet</button></div>')+
    '</div>';
   picker($('#sh-r'),f.r||0,function(v){f.r=v||null;f.w=true;commit();});

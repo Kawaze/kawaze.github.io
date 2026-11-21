@@ -311,3 +311,11 @@ dialog::backdrop{background:rgba(5,5,8,.6)}
 .credits p{margin:0}
 .credits a{color:inherit}
 .credits img{display:block;width:28px;height:28px}
+
+/* ===== Date de visionnage en bonus ===== */
+.adddate{align-self:flex-start;background:none;border:0;padding:2px 0;color:var(--accent);font:600 14px/1.3 var(--body);cursor:pointer;text-align:left}
+.adddate:hover{text-decoration:underline}
+.datebox{display:flex;gap:8px;align-items:center}
+.datebox input{flex:1}
+.stub.nodate .mon{font:800 18px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#lf-d-box[hidden],#lf-d-add[hidden]{display:none!important}
