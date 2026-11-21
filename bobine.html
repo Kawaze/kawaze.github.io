@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="bobine.css?v=7">
+<link rel="stylesheet" href="bobine.css?v=8">
 <meta name="theme-color" content="#111216">
 <script>try{var a=JSON.parse(localStorage.getItem("bobine.apparence")||"{}")||{},r=document.documentElement;if(a.theme==="creme")r.dataset.theme="light";else if(a.theme==="sombre")r.dataset.theme="dark";if(a.accent&&a.accent!=="rouge")r.dataset.accent=a.accent;}catch(e){}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -19,10 +19,10 @@
 <header class="marquee">
   <div class="bulbs" aria-hidden="true"></div>
   <div class="mq-in">
-    <div class="mq-top"><span class="mq-gauche"><span class="cc">Carnet ciné</span><a id="version" href="#manifeste" class="version">v1.6</a></span><span class="droite"><span class="chip" id="sync" data-s="local" role="status"><i></i><span>Sur cet appareil</span></span><button type="button" class="cbtn ico" data-action="apparence" aria-label="Apparence" title="Apparence"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 0 0 0 18c1 0 1.6-.8 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5C21 6.6 17 3 12 3Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg></button><span class="compte" id="compte"></span></span></div>
+    <div class="mq-top"><span class="mq-gauche"><span class="cc">Carnet ciné</span><a id="version" href="#manifeste" class="version">v1.7</a></span><span class="droite"><a class="cbtn forum" id="bt-forum" href="#forum"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" d="M4 5h16v11H9l-5 4z"/></svg><span>Forum</span><span id="bt-forum-n"></span></a><button type="button" class="cbtn ico dem" data-action="dem" aria-label="Déménager, importer ou exporter ton carnet" title="Déménager"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7 4v14M3 14l4 4 4-4M17 20V6M13 10l4-4 4 4"/></svg></button><span class="chip" id="sync" data-s="local" role="status"><i></i><span>Sur cet appareil</span></span><button type="button" class="cbtn ico" data-action="apparence" aria-label="Apparence" title="Apparence"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 0 0 0 18c1 0 1.6-.8 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5C21 6.6 17 3 12 3Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg></button><span class="compte" id="compte"></span></span></div>
     <h1 class="logo" aria-label="Bobine"><span>B</span><span>o</span><span>b</span><span>i</span><span>n</span><span>e</span></h1>
     <p class="tagline" style="margin:0">Le carnet ciné qui ne sera jamais à vendre</p>
-    <p class="affiche" id="affiche" style="margin:4px 0 0">0 film à l'affiche, 0 séance, 0 critique</p>
+    <p class="affiche" id="affiche" style="margin:4px 0 0">0 film à l'affiche</p>
   </div>
   <div class="bulbs b" aria-hidden="true"></div>
 </header>
@@ -51,6 +51,7 @@
       </div>
       <label class="fld"><span>Critique</span><textarea id="lf-rv" rows="4"></textarea></label>
       <label class="tog"><input type="checkbox" id="lf-sp"><span>Contient des spoilers</span></label>
+      <label class="tog carte" id="lf-ca-box" hidden><input type="checkbox" id="lf-ca"><span>Vu avec ma carte</span></label>
       <label class="fld"><span>Tags</span><input id="lf-tg" autocomplete="off"></label>
       <p class="err" id="lf-err" role="alert"></p>
       <div class="df">
@@ -70,6 +71,10 @@
 
 <dialog id="sheet" aria-label="Fiche du film"><div id="sheet-body"></div></dialog>
 
+<dialog id="dem" class="bas" aria-labelledby="dem-title">
+  <div class="dh"><h2 id="dem-title">Déménager</h2><button type="button" class="x" data-action="close" aria-label="Fermer">×</button></div>
+  <div class="dbody" id="dem-body"></div>
+</dialog>
 <dialog id="apparence" aria-labelledby="app-title">
   <div class="dh"><h2 id="app-title">Apparence</h2><button type="button" class="x" data-action="close" aria-label="Fermer">×</button></div>
   <div class="dbody" id="app-body"></div>
@@ -92,6 +97,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/dist/umd/supabase.js"></script>
 <script src="paris-config.js?v=8"></script>
-<script src="bobine.js?v=7"></script>
+<script src="bobine.js?v=8"></script>
 </body>
 </html>
