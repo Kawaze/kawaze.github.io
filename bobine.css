@@ -624,3 +624,15 @@ button.annee .primary{background:var(--accent);color:var(--on-accent);pointer-ev
 .nouv-plus summary{cursor:pointer;font:700 14px/1.4 var(--body);padding:8px 0;color:var(--ink)}
 .nouv-plus[open] summary{margin-bottom:8px}
 .nouv-plus>div{margin-bottom:6px}
+
+/* ---------- 1.8.2 : le top 5 de Bobine ---------- */
+.top5{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:20px}
+.top5 h3{font:800 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.03em;margin:0 0 10px}
+.top5 ol{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.top5 li{display:grid;grid-template-columns:22px 44px 1fr auto;gap:10px;align-items:center}
+.top5 .rang{font:900 24px/1 var(--display);color:var(--accent);text-align:center}
+.top5 .t5{display:flex;flex-direction:column;gap:3px;min-width:0}
+.top5 .t5 b{font-size:14.5px;line-height:1.25;overflow-wrap:anywhere}
+.t5-n{font:500 12px/1.3 var(--mono);color:var(--muted)}
+.t5-n .stars{font-size:12px}
+.top5 .ghost.small{padding:6px 8px;font-size:12px;color:var(--ink)}

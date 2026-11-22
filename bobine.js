@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.8.1';
+var VERSION='1.8.2';
 var NOUVEAUTES=[
+  ['1.8.2','La roulette part des notes et critiques des membres de Bobine, et le top 5 de Bobine arrive dans À voir'],
   ['1.8.1','Nouveautés repliées dans le Manifeste, feuille de route mise à jour'],
   ['1.8','Carnets visibles depuis le forum et les critiques, Sur Bobine avec la moyenne et les critiques des membres, roulette découverte, réalisateurs et succès, date à l’année'],
   ['1.7','Recherche avec affiches dans À voir et dans les listes, roulette pour choisir ton film, défis et badges, carte illimitée, ton année en story, Forum et Déménager en boutons'],
@@ -473,7 +474,7 @@ function regleAdmin(x){
 /* ---- Chargements après l'affichage d'une vue ---- */
 function apresRendu(r){
   if(r==='bilan'){garderTrophees();chargerFilmos();}
-  if(r==='a-voir'&&!LECTURE){if(RL.mode==='bobine'&&!RL.tend)chargerTendances();if(RL.mode==='gouts'&&!RL.reco)chargerReco();}
+  if(r==='a-voir'&&!LECTURE){chargerPool();chargerTop();}
   if(r==='forum'){
     var p=routeParam();
     if(p==='nouveau')return;
@@ -786,25 +787,49 @@ function critiqueRoulette(tm){
 }
 function tronque(s,n){s=String(s||'');return s.length>n?s.slice(0,n).replace(/\s+\S*$/,'')+'…':s;}
 
-/* ---------- Roulette « Je sais pas quoi regarder » : toujours une découverte ----------
+/* ---------- Roulette « Je sais pas quoi regarder » ----------
+   Elle part d'abord de Bobine : les films notés et critiqués par les autres membres,
+   choisis selon tes goûts (genres et réalisateurs des films que tu as aimés).
+   Quand Bobine n'a pas encore assez de films pour toi, TMDB complète avec ses recommandations.
    Jamais un film déjà vu, jamais un film déjà dans ta liste À voir. */
-var RL={mode:'gouts',id:null,tend:null,charge:false,tourne:false,soir:null,reco:null,recoCharge:false,graines:null,avecCrit:null};
+var RL={id:null,pool:null,poolCharge:false,tourne:false,soir:null,reco:null,recoCharge:false,graines:null,avecCrit:null,top:null,topCharge:false};
 try{RL.soir=localStorage.getItem('bobine.roulette')||null;}catch(e){}
-function candidatsBobine(){
-  if(!RL.tend)return null;
-  var deja=dejaPris();
-  return RL.tend.filter(function(x){return !deja[x.tm];}).map(function(x){
+function chargerPool(){
+  if(RL.poolCharge)return;RL.poolCharge=true;
+  if(!sb){RL.pool=[];chargerReco();return;}
+  appel('bobine_roulette_pool').then(function(d){RL.pool=d||[];if(candidatsPool().length<5)chargerReco();if(route()==='a-voir')render();},
+    function(){RL.pool=[];chargerReco();if(route()==='a-voir')render();});
+}
+function candidatsPool(){
+  if(!RL.pool)return [];
+  var deja=dejaPris(),pg=profilGenres(),tot=Object.values(pg).reduce(function(s,v){return s+v;},0)||1,am=aimes(),parReal={};
+  am.forEach(function(f){if(f.dri&&(!parReal[f.dri]||poidsAime(f)>poidsAime(parReal[f.dri])))parReal[f.dri]=f;});
+  return RL.pool.filter(function(x){return !deja[x.tm];}).map(function(x){
+    var g=x.g||[],gout=g.reduce(function(a,id){return a+(pg[id]||0);},0)/tot,real=x.dri&&parReal[x.dri];
+    var s=1+gout*5+(real?3:0)+Math.max(0,(Number(x.moy)||3)-3)*1.5+(x.crit?1.5:0)+(x.cc?.5:0)+Math.log(1+(x.nb||1))*.5;
+    var why;
+    if(real)why='Parce que tu as aimé '+real.t+', aussi de '+x.dr;
+    else{
+      var proche=null,best=0;am.forEach(function(f){var n=(f.g||[]).filter(function(id){return g.indexOf(id)>=0;}).length;if(n>best||n===best&&n&&poidsAime(f)>poidsAime(proche)){best=n;proche=f;}});
+      why=proche&&best?'Parce que tu as aimé '+proche.t:(x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Bien noté sur Bobine');
+    }
     var f=Object.values(S.films).find(function(y){return y.tm===x.tm;})||{k:'tm'+x.tm,t:x.t,y:x.y,p:x.p,dr:x.dr,m:x.m,tm:x.tm};
-    var why=x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Note moyenne '+moyenne(x.moy)+' sur Bobine, '+x.nb+' carnets';
-    return {id:'tm:'+x.tm,f:f,poids:Math.max(.5,Number(x.moy)-2.5),why:why,tm:x};
-  });
+    return {id:'tm:'+x.tm,f:f,poids:s*s,why:why,tm:x};
+  }).sort(function(a,b){return b.poids-a.poids;}).slice(0,30);
+}
+function rlCandidats(){
+  if(RL.pool===null)return null;
+  var c=candidatsPool();
+  if(c.length>=5||!TMDB_FN)return c;
+  if(RL.reco===null){chargerReco();return c.length?c:null;}
+  var vus={};c.forEach(function(x){vus[x.id]=1;});
+  return c.concat((candidatsGouts()||[]).filter(function(x){return !vus[x.id];}).map(function(x){x.poids=x.poids/4;return x;}));
 }
 function tirer(c,sauf){
   var pool=c.length>1?c.filter(function(x){return x.id!==sauf;}):c,tot=pool.reduce(function(s,x){return s+x.poids;},0),r=Math.random()*tot;
   for(var i=0;i<pool.length;i++){r-=pool[i].poids;if(r<=0)return pool[i];}
   return pool[pool.length-1];
 }
-function rlCandidats(){return RL.mode==='gouts'?candidatsGouts():candidatsBobine();}
 function rlCourant(c){
   if(!c||!c.length)return null;
   var it=c.find(function(x){return x.id===RL.id;})||(RL.soir&&c.find(function(x){return x.id===RL.soir;}));
@@ -812,12 +837,9 @@ function rlCourant(c){
   return it;
 }
 function roulette(){
-  var chip=function(v,l){return '<button type="button" data-action="rlmode" data-v="'+v+'" aria-pressed="'+(RL.mode===v)+'">'+l+'</button>';};
   var c=rlCandidats(),it=null,corps;
-  if(!TMDB_FN&&RL.mode==='gouts')corps='<p class="rl-vide">La roulette a besoin de la connexion au site pour chercher des films.</p>';
-  else if(RL.mode==='gouts'&&!aimes().length)corps='<p class="rl-vide">Note quelques films que tu as aimés, de 3,5 à 5 étoiles ou en coup de cœur, et la roulette te fera découvrir des films dans le même esprit.</p>';
-  else if(c===null)corps='<p class="rl-vide">'+(RL.mode==='bobine'&&!sb?'Il faut la connexion au site pour voir les films préférés de Bobine.':'La roulette cherche des films pour toi…')+'</p>';
-  else if(!(it=rlCourant(c)))corps='<p class="rl-vide">'+(RL.mode==='gouts'?'Tu as déjà vu tout ce qu’on avait à te proposer. Note d’autres films que tu as aimés pour élargir la roulette.':'Pas encore assez de notes sur Bobine pour ça. Reviens bientôt.')+'</p>';
+  if(c===null)corps='<p class="rl-vide">La roulette cherche des films pour toi…</p>';
+  else if(!(it=rlCourant(c)))corps='<p class="rl-vide">'+(aimes().length?'Tu as déjà vu tout ce qu’on avait à te proposer. Reviens quand les autres membres auront noté de nouveaux films.':'Note quelques films que tu as aimés, et la roulette te proposera des films notés sur Bobine dans le même esprit.')+'</p>';
   else{
     rlEnrichir(it);
     var f=it.f,fi=(RLF[f.tm]&&RLF[f.tm].fi)||{},dr=f.dr||fi.dr,m=f.m||fi.m;
@@ -828,16 +850,24 @@ function roulette(){
       '<div class="btnrow">'+(soir?'<button class="primary" type="button" data-action="rlnote">Je l’ai vu, je le note</button>':'<button class="primary" type="button" data-action="rlgo">Je le regarde</button>')+
       (c.length>1?'<button class="ghost" type="button" data-action="rlnext">Relancer</button>':'')+'</div>';
   }
-  return '<section class="roulette" aria-label="Roulette"><div class="bulbs" aria-hidden="true"></div><div class="rl-in"><h3>Je sais pas quoi regarder</h3>'+
-    '<div class="rl-modes">'+chip('gouts','Selon mes goûts')+chip('bobine','Les mieux notés de Bobine')+'</div>'+corps+'</div></section>';
+  return '<section class="roulette" aria-label="Roulette"><div class="bulbs" aria-hidden="true"></div><div class="rl-in"><h3>Je sais pas quoi regarder</h3>'+corps+'</div></section>';
 }
-function chargerTendances(){
-  if(RL.charge||!sb)return;RL.charge=true;
-  appel('bobine_tendances').then(function(d){RL.tend=d||[];if(route()==='a-voir')render();},function(){RL.tend=[];RL.charge=false;if(route()==='a-voir')render();});
+/* Le top 5 de Bobine : les mieux notés du site, au moins 2 carnets par film */
+function chargerTop(){
+  if(RL.topCharge||!sb)return;RL.topCharge=true;
+  appel('bobine_tendances').then(function(d){RL.top=(d||[]).slice(0,5);if(route()==='a-voir')render();},function(){RL.top=[];});
+}
+function topBobine(){
+  if(!sb||!RL.top||!RL.top.length)return '';
+  return '<section class="top5" aria-label="Le top 5 de Bobine"><h3>Le top 5 de Bobine</h3><ol>'+RL.top.map(function(x,i){
+    var f=Object.values(S.films).find(function(y){return y.tm===x.tm;}),pf=f||{k:'tm'+x.tm,t:x.t,y:x.y,p:x.p,tm:x.tm};
+    var etat=f&&f.w?'<span class="tag">vu</span>':f&&f.wl?'<span class="tag">dans À voir</span>':'<button class="ghost small" type="button" data-action="topwl" data-i="'+i+'">+ À voir</button>';
+    return '<li><span class="rang">'+(i+1)+'</span>'+poster(pf,'mini')+'<span class="t5"><b>'+esc(x.t)+' <span class="fy">'+esc(x.y||'')+'</span></b><span class="t5-n"><span class="stars">'+stars(Math.round(x.moy*2)/2)+'</span> '+moyenne(x.moy)+', '+plural(x.nb,'carnet','carnets')+'</span></span>'+etat+'</li>';
+  }).join('')+'</ol></section>';
 }
 function actionRoulette(act,a){
+  if(act==='topwl'){var x=RL.top&&RL.top[+a.dataset.i];if(!x)return;var g2=filmDepuis({tm:x.tm,t:x.t,y:x.y,p:x.p,dr:x.dr,m:x.m});if(g2&&!g2.w&&!g2.wl){g2.wl=today();commit();toast('« '+g2.t+' » ajouté à À voir');}return;}
   var c=rlCandidats(),it=rlCourant(c);
-  if(act==='rlmode'){RL.mode=a.dataset.v;RL.id=null;render();if(RL.mode==='bobine')chargerTendances();else chargerReco();return;}
   if(!it)return;
   if(act==='rlnext'){var n=tirer(c,it.id);RL.id=n.id;RL.tourne=true;render();setTimeout(function(){RL.tourne=false;},700);}
   if(act==='rlgo'){
@@ -1242,7 +1272,7 @@ films:function(){
 'a-voir':function(){
   var arr=Object.values(S.films).filter(function(f){return f.wl&&!f.w;}).sort(function(a,b){return (b.wl||'').localeCompare(a.wl||'');});
   var h='<div class="viewhead"><h2>À voir</h2><p class="sub">'+plural(arr.length,'film','films')+'</p></div>';
-  if(!LECTURE)h+=champRq('wl','Chercher un film à ajouter')+roulette();
+  if(!LECTURE)h+=champRq('wl','Chercher un film à ajouter')+roulette()+topBobine();
   if(!arr.length)return h+'<p class="muted">'+(LECTURE?'Rien en attente pour l’instant.':'Rien en attente. Cherche un film ci-dessus, ou importe ta watchlist Letterboxd.')+'</p>';
   return h+'<div class="grid wl-grid">'+arr.slice(0,240).map(function(f){
     return '<div class="card"><button class="card-p" type="button" data-action="sheet" data-k="'+esc(f.k)+'" aria-label="'+esc(f.t+(f.y?' ('+f.y+')':''))+'">'+poster(f)+'</button><span class="ct" title="'+esc(f.t)+'">'+esc(f.t)+'</span><span class="cy">'+esc([f.y,f.dr].filter(Boolean).join(', '))+'</span>'+
@@ -1849,7 +1879,7 @@ document.addEventListener('click',function(ev){
     case 'carteedit':carteEdit=true;render();setTimeout(function(){var i=$('#carteform input');if(i)i.focus();},0);break;
     case 'cartenon':carteEdit=false;render();break;
     case 'cartesuppr':enregistrerCarte(null,null);break;
-    case 'rlmode':case 'rlnext':case 'rlgo':case 'rlnote':actionRoulette(act,a);break;
+    case 'rlnext':case 'rlgo':case 'rlnote':case 'topwl':actionRoulette(act,a);break;
     case 'sigcrit':signalerCritique(a.dataset.n);break;
     case 'surbtout':surbTout=true;var fs=film(sheetK);if(fs){var cs=FB[cleFB(fs)];$('#sh-bobine').innerHTML=htmlSurBobine(fs,cs&&cs.d);}break;
     case 'lwl':var f5=film(a.dataset.k);if(f5&&!f5.w){f5.wl=today();commit();toast('« '+f5.t+' » ajouté à À voir');}break;
