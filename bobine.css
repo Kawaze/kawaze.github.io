@@ -620,3 +620,7 @@ button.annee .primary{background:var(--accent);color:var(--on-accent);pointer-ev
 .reals-tous summary{cursor:pointer;font:700 14px/1.4 var(--body);padding:6px 0;color:var(--ink)}
 .reals-tous[open] summary{margin-bottom:10px}
 #info .dbody p{margin:0;line-height:1.5}
+.nouv-plus{grid-column:1/-1}
+.nouv-plus summary{cursor:pointer;font:700 14px/1.4 var(--body);padding:8px 0;color:var(--ink)}
+.nouv-plus[open] summary{margin-bottom:8px}
+.nouv-plus>div{margin-bottom:6px}

@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.8';
+var VERSION='1.8.1';
 var NOUVEAUTES=[
+  ['1.8.1','Nouveautés repliées dans le Manifeste, feuille de route mise à jour'],
   ['1.8','Carnets visibles depuis le forum et les critiques, Sur Bobine avec la moyenne et les critiques des membres, roulette découverte, réalisateurs et succès, date à l’année'],
   ['1.7','Recherche avec affiches dans À voir et dans les listes, roulette pour choisir ton film, défis et badges, carte illimitée, ton année en story, Forum et Déménager en boutons'],
   ['1.6','Fond crème ou sombre et six couleurs au choix, ticket qui se détache, ampoules pour les coups de cœur, critiques avec spoilers floutés, plus de compteur de séances'],
@@ -1053,7 +1054,6 @@ function infoCarnets(){
   if(LECTURE||Store.mode!=='db'||reglages.prive)return;
   try{if(localStorage.getItem('bobine.info18'))return;localStorage.setItem('bobine.info18','1');}catch(e){return;}
   $('#info-body').innerHTML='<p>Bobine devient un vrai coin de cinéphiles. Ton carnet est maintenant visible par les autres membres, depuis ton pseudo dans le forum et sous tes critiques, dans la fiche des films et dans la roulette.</p>'+
-    '<p>Rien d’autre que ton carnet. Bobine ne garde jamais où tu as vu un film, et ta carte illimitée reste visible par toi seul.</p>'+
     '<p>Tu préfères rester dans ton coin ? Passe ton carnet en privé, il disparaît de partout. Tu peux changer d’avis quand tu veux dans ton compte.</p>'+
     '<div class="df"><button class="ghost" type="button" data-action="infoprive">Passer en privé</button><span class="sp"></span><button class="primary" type="button" data-action="close">Compris</button></div>';
   setTimeout(function(){if(!$$('dialog[open]').length)showDialog($('#info'));},900);
@@ -1317,6 +1317,7 @@ bilan:function(){
   return h;
 },
 manifeste:function(){
+  function ligneNouv(n){return '<div><span class="st ok">v'+n[0]+'</span><span>'+esc(n[1])+'</span></div>';}
   return '<article class="manif"><h2>Bobine ne sera jamais à vendre.</h2>'+
   '<p class="lead">Letterboxd est en train de changer de mains pour 330 millions de dollars. Ce n’est pas un drame, c’est un rappel. Une communauté qui appartient à quelqu’un d’autre peut toujours être vendue. Bobine part de l’idée inverse.</p>'+
   '<ol>'+
@@ -1338,10 +1339,11 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Ton année en story, défis et badges, roulette À voir, carte illimitée</span></div>'+
   '<div><span class="st ok">Fait</span><span>Carnets visibles entre membres, moyenne et critiques de Bobine sur chaque film, roulette découverte, réalisateurs et succès</span></div>'+
   '<div><span class="st">Ensuite</span><span>Mentions légales, ouverture au public de Twitch</span></div>'+
-  '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
+  '<div><span class="st">Plus tard</span><span>Bobine sur son propre site, ouvert à tout le monde</span></div>'+
   '</div></section>'+
   '<section class="card-box" id="nouveautes"><h3>Nouveautés</h3><div class="roadmap">'+
-  NOUVEAUTES.map(function(n){return '<div><span class="st ok">v'+n[0]+'</span><span>'+esc(n[1])+'</span></div>';}).join('')+
+  NOUVEAUTES.slice(0,3).map(ligneNouv).join('')+
+  (NOUVEAUTES.length>3?'<details class="nouv-plus"><summary>Voir les '+(NOUVEAUTES.length-3)+' mises à jour d’avant</summary>'+NOUVEAUTES.slice(3).map(ligneNouv).join('')+'</details>':'')+
   '</div></section></article>';
 },
 forum:function(){return vueForum();},
@@ -1352,7 +1354,7 @@ confidentialite:function(){
   '<p class="lead">Bobine garde le strict nécessaire, et tu peux tout reprendre ou tout effacer quand tu veux.</p>'+
   '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, utilise Écrire à l’équipe, depuis le Forum.</p></section>'+
   '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Si tu règles une carte illimitée, son prix et les séances vues avec. Ces deux infos ne sont visibles que par toi, jamais sur ton carnet public.</p><p>Tes messages sur le forum, publics et signés de ton pseudo, et ta conversation avec l’équipe, que seuls toi et l’équipe lisez. Il n’y a pas de messages privés entre membres.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
-  '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Bobine est fait pour partager ton carnet de cinéphile. Il est visible par les autres membres, depuis ton pseudo dans le forum, sous tes critiques dans la fiche d’un film et dans la roulette, et par toute personne à qui tu donnes son lien.</p><p>Bobine ne garde jamais où tu as vu un film. Pas de lieu, pas de cinéma, pas d’adresse. Ta carte illimitée et ses séances restent visibles par toi seul.</p><p>Les carnets ne sont pas référencés sur Google.</p><p>Tu préfères rester dans ton coin ? Passe ton carnet en privé depuis ton compte. Il disparaît alors de partout, des moyennes, des critiques, de la roulette et du forum, et plus personne d’autre que toi ne peut le lire.</p><p>Une critique qui pose problème peut être signalée, et l’équipe peut la masquer.</p></section>'+
+  '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Bobine est fait pour partager ton carnet de cinéphile. Il est visible par les autres membres, depuis ton pseudo dans le forum, sous tes critiques dans la fiche d’un film et dans la roulette, et par toute personne à qui tu donnes son lien.</p><p>Ta carte illimitée et ses séances restent visibles par toi seul.</p><p>Les carnets ne sont pas référencés sur Google.</p><p>Tu préfères rester dans ton coin ? Passe ton carnet en privé depuis ton compte. Il disparaît alors de partout, des moyennes, des critiques, de la roulette et du forum, et plus personne d’autre que toi ne peut le lire.</p><p>Une critique qui pose problème peut être signalée, et l’équipe peut la masquer.</p></section>'+
   '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base, sur des serveurs en Irlande, dans l’Union européenne. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
   '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement depuis ton compte, ce qui efface aussi tes messages du forum et ta conversation avec l’équipe. Pour effacer aussi ton compte Twitch relié, écris à l’équipe.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
   '</article>';
