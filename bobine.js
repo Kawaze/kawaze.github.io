@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.7';
+var VERSION='1.8';
 var NOUVEAUTES=[
+  ['1.8','Carnets visibles depuis le forum et les critiques, Sur Bobine avec la moyenne et les critiques des membres, roulette découverte, réalisateurs et succès, date à l’année'],
   ['1.7','Recherche avec affiches dans À voir et dans les listes, roulette pour choisir ton film, défis et badges, carte illimitée, ton année en story, Forum et Déménager en boutons'],
   ['1.6','Fond crème ou sombre et six couleurs au choix, ticket qui se détache, ampoules pour les coups de cœur, critiques avec spoilers floutés, plus de compteur de séances'],
   ['1.5','Forum pour les idées, les bugs et les discussions, et conversation privée avec l’équipe'],
@@ -34,8 +35,8 @@ function plural(n,one,many){return fmtN(n)+' '+(n>1?many:one);}
 function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function stars(r){if(!r)return '';var f=Math.floor(r);return '★'.repeat(f)+(r-f>=0.5?'½':'');}
 function ratingWords(r){return r?String(r).replace('.',',')+' sur 5':'sans note';}
-function monthLabel(ym){var p=ym.split('-');if(!p[1])return 'Vus';return MOIS[+p[1]-1]+' '+p[0];}
-function fmtDate(d){if(!d)return '';var p=d.split('-');return +p[2]+' '+MOIS[+p[1]-1]+' '+p[0];}
+function monthLabel(ym){if(/^\d{4}$/.test(ym))return 'En '+ym;var p=ym.split('-');if(!p[1])return 'Vus';return MOIS[+p[1]-1]+' '+p[0];}
+function fmtDate(d){if(!d)return '';if(/^\d{4}$/.test(d))return 'en '+d;var p=d.split('-');return +p[2]+' '+MOIS[+p[1]-1]+' '+p[0];}
 
 /* ---------- État ---------- */
 var S=blank();
@@ -142,7 +143,7 @@ function connect(){
 }
 function changerCompte(id){
   if(!id){
-    if(Store.mode==='db'){lsDel('bobine.compte.'+Store.user);Store.mode='local';Store.user=null;Store.profil=null;Store.last=null;reglages={prive:false};S=upgrade(lsGet(LS));render();}
+    if(Store.mode==='db'){lsDel('bobine.compte.'+Store.user);Store.mode='local';Store.user=null;Store.profil=null;Store.last=null;reglages={prive:false};reglagesOk=false;S=upgrade(lsGet(LS));render();}
     FZ.notifs={admin:false,contact:0,a_traiter:0};setStatus('local');renderCompte();renderTabs();setTimeout(rattraper,1500);return;
   }
   Store.user=id;Store.mode='db';Store.last=null;setStatus('loading');renderCompte();
@@ -194,18 +195,18 @@ var ratt=false;
 function rattraper(){
   if(LECTURE||!TMDB_FN||ratt)return;
   var liste=Object.values(S.films).filter(function(f){return f.tm==null&&f.t;});
-  if(!liste.length)return;
+  if(!liste.length){completer();return;}
   ratt=true;var i=0,ajoutes=0,gros=liste.length>15;
   if(gros)toast('Recherche des affiches pour '+plural(liste.length,'film','films')+'…');
   (function suivant(){
     var lot=liste.slice(i,i+20);i+=20;
-    if(!lot.length){ratt=false;commit();if(gros)toast(plural(ajoutes,'affiche ajoutée','affiches ajoutées')+' depuis TMDB');return;}
+    if(!lot.length){ratt=false;commit();if(gros)toast(plural(ajoutes,'affiche ajoutée','affiches ajoutées')+' depuis TMDB');setTimeout(completer,800);return;}
     timeout(fetch(TMDB_FN,{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.cle||''},body:JSON.stringify({films:lot.map(function(f){return {k:f.k,t:f.t,y:f.y};})})}).then(function(r){return r.json();}),30000)
     .then(function(d){
       (d.films||[]).forEach(function(r){
         var f=S.films[r.k];if(!f||r.id===null||r.id===undefined)return;
         f.tm=r.id||0;
-        if(r.id){if(r.p)f.p=r.p;if(r.dr)f.dr=r.dr;if(!f.m&&r.m)f.m=r.m;ajoutes++;}
+        if(r.id){if(r.p)f.p=r.p;if(r.dr)f.dr=r.dr;if(!f.m&&r.m)f.m=r.m;if(r.g)appliquerFiche(f,r);ajoutes++;}
       });
       commit({norender:i%100!==0});
       setTimeout(suivant,300);
@@ -237,12 +238,12 @@ function chercherSug(q){
 function choisirSug(i){
   var it=sugItems[i];if(!it)return;fermerSug();
   $('#lf-t').value=it.t;$('#lf-y').value=it.y||'';
-  if(it.local){var f=film(it.k);logCtx.tmdb=null;if(f&&f.m&&!$('#lf-m').value)$('#lf-m').value=fmtDurShort(f.m);$('#lf-r').focus();return;}
-  logCtx.tmdb={id:it.tm,t:it.t,y:it.y||'',p:it.p};
+  if(it.local){var f=film(it.k);logCtx.tmdb=null;if(f&&f.m&&!$('#lf-m').value)$('#lf-m').value=fmtDurShort(f.m);statsNoter(f);$('#lf-r').focus();return;}
+  logCtx.tmdb={id:it.tm,t:it.t,y:it.y||'',p:it.p};statsNoter({tm:it.tm,k:'tm'+it.tm});
   $('#lf-r').focus();
   tmdbGet({id:it.tm}).then(function(d){
     var fi=d&&d.fiche;if(!fi||!logCtx.tmdb||logCtx.tmdb.id!==it.tm)return;
-    logCtx.tmdb.m=fi.m;logCtx.tmdb.dr=fi.dr;if(fi.p)logCtx.tmdb.p=fi.p;
+    logCtx.tmdb.m=fi.m;logCtx.tmdb.dr=fi.dr;logCtx.tmdb.fi=fi;if(fi.p)logCtx.tmdb.p=fi.p;
     if(fi.m&&!$('#lf-m').value)$('#lf-m').value=fmtDurShort(fi.m);
   },function(){});
 }
@@ -280,7 +281,7 @@ function renderDlgCompte(){
   var p=Store.profil||{};
   $('#cpt-body').innerHTML=
     '<div class="fld"><span>Le lien de ton carnet</span><div class="datebox"><input id="cpt-lien" readonly value="'+esc(lienCarnet())+'"><button type="button" class="ghost small" data-action="cptcopie">Copier</button></div>'+
-    '<p class="muted petit">'+(reglages.prive?'Ton carnet est privé, ce lien n’affiche rien aux autres.':'Toute personne qui a ce lien peut lire ton carnet. Il n’apparaît nulle part ailleurs.')+'</p></div>'+
+    '<p class="muted petit">'+(reglages.prive?'Ton carnet est privé, ce lien n’affiche rien aux autres.':'Ton carnet est visible sur Bobine, depuis ton pseudo et sous tes critiques. Ce lien sert à le partager ailleurs.')+'</p></div>'+
     '<label class="tog large"><input type="checkbox" id="cpt-prive"'+(reglages.prive?' checked':'')+'><span>Carnet privé</span></label>'+
     '<div class="fld"><span>Tes données</span><p class="muted petit"><a href="#contact" data-action="close">Écrire à l’équipe</a><br><button class="lien" type="button" data-action="dem">Exporter tout ton carnet</button><br><a href="#confidentialite" data-action="close">Confidentialité</a></p></div>'+
     (confirmSuppr===0?'<button type="button" class="ghost danger" data-action="cptsuppr">Supprimer mon carnet</button>':
@@ -292,7 +293,7 @@ document.addEventListener('change',function(ev){
   if(ev.target.id!=='cpt-prive')return;
   var v=ev.target.checked;ev.target.disabled=true;
   sb.rpc('bobine_rendre_prive',{p_prive:v}).then(function(r){
-    if(r.error){toast('Impossible de changer, réessaie');reglages.prive=!v;}else{reglages.prive=v;toast(v?'Ton carnet est privé':'Ton carnet est public pour qui a le lien');}
+    if(r.error){toast('Impossible de changer, réessaie');reglages.prive=!v;}else{reglages.prive=v;toast(v?'Ton carnet est privé':'Ton carnet est visible sur Bobine');}
     renderDlgCompte();
   });
 });
@@ -337,7 +338,7 @@ function appel(nom,args){
   return timeout(sb.rpc(nom,args||{}),15000).then(function(r){if(r.error)throw r.error;return r.data;});
 }
 function avatarDe(a){return a&&a.avatar?'<img class="av" src="'+esc(a.avatar)+'" alt="" width="32" height="32" loading="lazy">':'<span class="av vide">'+esc(((a&&a.pseudo)||'?').charAt(0))+'</span>';}
-function nomDe(a){return '<b>'+esc((a&&a.pseudo)||'Membre')+'</b>'+(a&&a.admin?'<span class="badge-eq">équipe</span>':'');}
+function nomDe(a){return '<b>'+(a&&a.carnet&&a.pseudo?lienPseudo(a.pseudo):esc((a&&a.pseudo)||'Membre'))+'</b>'+(a&&a.admin?'<span class="badge-eq">équipe</span>':'');}
 function pastille(n){return n?'<span class="pastille" aria-label="'+n+' à lire">'+n+'</span>':'';}
 
 /* Pastilles de non-lus (onglets Forum et Admin) */
@@ -438,10 +439,14 @@ function vueAdmin(){
   if(p)return '<p class="fz-retour"><a href="#admin">← Admin</a></p><div id="fz"><p class="muted">Chargement…</p></div>';
   return fzNav('admin')+'<div class="viewhead"><h2>Admin</h2><p class="sub">visible par toi seul</p></div>'+
     '<section class="card-box"><h3>Messages privés</h3><div id="fz-conv"><p class="muted">Chargement…</p></div></section>'+
-    '<section class="card-box"><h3>Signalements</h3><div id="fz-sign"><p class="muted">Chargement…</p></div></section>';
+    '<section class="card-box"><h3>Signalements</h3><div id="fz-sign"><p class="muted">Chargement…</p></div></section>'+
+    '<section class="card-box"><h3>Critiques signalées</h3><div id="fz-crit"><p class="muted">Chargement…</p></div></section>';
 }
 function remplirAdmin(){
-  var c=$('#fz-conv'),g=$('#fz-sign');
+  var c=$('#fz-conv'),g=$('#fz-sign'),k=$('#fz-crit');
+  if(k)k.innerHTML=(FZ.adm.crit||[]).length?FZ.adm.crit.map(function(x){
+    return '<div class="sign"><p class="fz-meta">'+esc(x.par.pseudo)+' signale la critique de '+esc(x.auteur.pseudo)+' sur '+esc(x.film||'un film')+', '+quand(x.cree_le)+'</p>'+
+      '<blockquote>'+texteMsg(x.texte)+'</blockquote><div class="btnrow"><button class="primary small" type="button" data-action="fzcrit" data-n="'+x.num+'" data-act="masquer">Masquer la critique</button><button class="ghost small" type="button" data-action="fzcrit" data-n="'+x.num+'" data-act="ignorer">Laisser, rien à faire</button></div></div>';}).join(''):'<p class="muted">Rien à traiter.</p>';
   if(c)c.innerHTML=(FZ.adm.conv||[]).length?'<ul class="fz-liste">'+FZ.adm.conv.map(function(x){
     return '<li><a class="fz-sujet" href="#admin/'+encodeURIComponent(x.user_id)+'"><span class="fz-titre">'+esc(x.membre.pseudo)+pastille(x.non_lus)+'</span><span class="fz-meta">'+esc(x.apercu||'')+'</span><span class="fz-meta">'+quand(x.dernier_le)+'</span></a></li>';}).join('')+'</ul>':'<p class="muted">Aucun message.</p>';
   if(g)g.innerHTML=(FZ.adm.sign||[]).length?FZ.adm.sign.map(function(x){
@@ -466,7 +471,8 @@ function regleAdmin(x){
 
 /* ---- Chargements après l'affichage d'une vue ---- */
 function apresRendu(r){
-  if(r==='a-voir'&&RL.mode==='bobine'&&!RL.tend)chargerTendances();
+  if(r==='bilan'){garderTrophees();chargerFilmos();}
+  if(r==='a-voir'&&!LECTURE){if(RL.mode==='bobine'&&!RL.tend)chargerTendances();if(RL.mode==='gouts'&&!RL.reco)chargerReco();}
   if(r==='forum'){
     var p=routeParam();
     if(p==='nouveau')return;
@@ -480,7 +486,7 @@ function apresRendu(r){
   if(r==='admin'&&FZ.notifs.admin){
     var u=routeParam();
     if(u){if(FZ.adm.pour!==u){FZ.adm.regle=0;FZ.adm.pour=u;}appel('bobine_admin_conversation',{p_user:u}).then(function(d){FZ.adm.une=d;remplirConvAdmin();chargerNotifs();});return;}
-    Promise.all([appel('bobine_admin_conversations'),appel('bobine_admin_signalements')]).then(function(d){FZ.adm.conv=d[0]||[];FZ.adm.sign=d[1]||[];if(route()==='admin'&&!routeParam())remplirAdmin();});
+    Promise.all([appel('bobine_admin_conversations'),appel('bobine_admin_signalements'),appel('bobine_admin_signal_critiques').catch(function(){return [];})]).then(function(d){FZ.adm.conv=d[0]||[];FZ.adm.sign=d[1]||[];FZ.adm.crit=d[2]||[];if(route()==='admin'&&!routeParam())remplirAdmin();});
   }
 }
 
@@ -511,6 +517,9 @@ function actionForum(act,a){
   }
   if(act==='fzmod'){
     appel('bobine_moderer',{p_quoi:a.dataset.quoi,p_id:+a.dataset.id,p_action:a.dataset.act}).then(function(){FZ.liste=null;toast('C’est fait');apresRendu(route());chargerNotifs();},function(e){toast(erreurRpc(e));});
+  }
+  if(act==='fzcrit'){
+    appel('bobine_moderer_critique',{p_num:+a.dataset.n,p_action:a.dataset.act}).then(function(){toast(a.dataset.act==='masquer'?'Critique masquée':'Signalement classé');FZ.adm.crit=(FZ.adm.crit||[]).filter(function(x){return String(x.num)!==a.dataset.n;});remplirAdmin();chargerNotifs();},function(e){toast(erreurRpc(e));});
   }
   if(act==='fzregle'){FZ.adm.regle=1;remplirConvAdmin();}
   if(act==='fzrouvrir'){FZ.adm.regle=0;remplirConvAdmin();}
@@ -600,9 +609,9 @@ function filmDepuis(it){
   if(it.raw){var p=splitTitle(it.t,'');if(!p[0])return null;var fr=ensureFilm(p[0],p[1]);setTimeout(rattraper,600);return fr;}
   var f=Object.values(S.films).find(function(x){return x.tm===it.tm;})||ensureFilm(it.t,it.y||'');
   f.tm=it.tm;if(it.p)f.p=it.p;if(it.dr&&!f.dr)f.dr=it.dr;if(it.m&&!f.m)f.m=it.m;
-  if(!f.dr||!f.m)tmdbGet({id:it.tm}).then(function(d){
+  if(!f.dr||!f.m||!f.g)tmdbGet({id:it.tm}).then(function(d){
     var fi=d&&d.fiche;if(!fi||!S.films[f.k])return;
-    if(fi.dr)f.dr=fi.dr;if(!f.m&&fi.m)f.m=fi.m;if(fi.p)f.p=fi.p;commit();
+    if(fi.dr)f.dr=fi.dr;if(!f.m&&fi.m)f.m=fi.m;if(fi.p)f.p=fi.p;appliquerFiche(f,fi);commit();
   },function(){});
   return f;
 }
@@ -645,32 +654,147 @@ document.addEventListener('focusout',function(ev){
 document.addEventListener('mousedown',function(ev){if(ev.target.closest('.rq-sug'))ev.preventDefault();});
 document.addEventListener('click',function(ev){var x=ev.target.closest('[data-rqi]');if(x)rqChoisir(x.dataset.rqid,+x.dataset.rqi);});
 
-/* ---------- Roulette « Je sais pas quoi regarder » ----------
-   Selon tes goûts : un film de ta liste À voir, poussé par tes réalisateurs et ta décennie préférés.
-   Les mieux notés de Bobine : moyennes des carnets publics, sans jamais dire qui a noté quoi. */
-var RL={mode:'gouts',id:null,tend:null,charge:false,tourne:false,soir:null};
-try{RL.soir=localStorage.getItem('bobine.roulette')||null;}catch(e){}
-function moisDe(d){var p=String(d||'').split('-');return p[1]?MOIS[+p[1]-1]+' '+p[0]:'un moment';}
-function candidatsGouts(){
-  var dr={},dec={};
-  Object.values(S.films).forEach(function(f){
-    if(!f.w)return;var w=(f.l?2:0)+(f.r>=4.5?2:f.r>=4?1:0);if(!w)return;
-    if(f.dr){var x=dr[f.dr]||(dr[f.dr]={n:0,t:f.t,best:0});x.n+=w;if(w>x.best){x.best=w;x.t=f.t;}}
-    var y=parseInt(f.y,10);if(y>1870){var d=Math.floor(y/10)*10;dec[d]=(dec[d]||0)+w;}
-  });
-  var topDec=Object.keys(dec).sort(function(a,b){return dec[b]-dec[a];})[0];
-  return Object.values(S.films).filter(function(f){return f.wl&&!f.w;}).map(function(f){
-    var s=1,why='',d=f.dr&&dr[f.dr];
-    if(d){s+=3+d.n;why='Parce que tu as aimé '+d.t+', aussi de '+f.dr;}
-    else{var y=parseInt(f.y,10),dd=y>1870?Math.floor(y/10)*10:null;if(dd&&String(dd)===topDec){s+=2;why='Les années '+dd+', ta décennie préférée';}}
-    if(!why)why='Dans ta liste depuis '+moisDe(f.wl);
-    return {id:'k:'+f.k,f:f,poids:s,why:why};
-  });
+/* ---------- 1.8 : genres, pays et réalisateur de chaque film ----------
+   Complétés en tâche de fond depuis la fonction TMDB, 25 films à la fois. */
+var GENRES={28:'Action',12:'Aventure',16:'Animation',35:'Comédie',80:'Crime',99:'Documentaire',18:'Drame',10751:'Familial',14:'Fantastique',36:'Histoire',27:'Horreur',10402:'Musique',9648:'Mystère',10749:'Romance',878:'Science-fiction',10770:'Téléfilm',53:'Thriller',10752:'Guerre',37:'Western'};
+function appliquerFiche(f,fi){
+  if(!f||!fi)return;
+  f.g=fi.g||[];f.pa=fi.pa||[];f.dri=fi.dri||null;
+  if(fi.p&&!f.p)f.p=fi.p;if(fi.dr&&!f.dr)f.dr=fi.dr;if(!f.m&&fi.m)f.m=fi.m;
 }
+var compl=false;
+function completer(){
+  if(LECTURE||!TMDB_FN||compl||ratt)return;
+  var liste=Object.values(S.films).filter(function(f){return f.tm>0&&!f.g;});
+  if(!liste.length){chargerFilmos();return;}
+  compl=true;var i=0;
+  (function suivant(){
+    var lot=liste.slice(i,i+25);i+=25;
+    if(!lot.length||i>1000){compl=false;commit({norender:true});if(route()==='bilan'||route()==='a-voir')render();chargerFilmos();return;}
+    timeout(fetch(TMDB_FN,{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.cle||''},body:JSON.stringify({ids:lot.map(function(f){return f.tm;})})}).then(function(r){return r.json();}),40000)
+    .then(function(d){
+      var par={};(d.fiches||[]).forEach(function(fi){par[fi.id]=fi;});
+      lot.forEach(function(f){if(par[f.tm])appliquerFiche(f,par[f.tm]);else f.g=f.g||[];});
+      commit({norender:true});setTimeout(suivant,400);
+    },function(e){console.warn('Bobine : TMDB indisponible',e);compl=false;});
+  })();
+}
+
+/* ---------- « Sur Bobine » : moyenne, nombre de carnets et critiques des autres ---------- */
+var FB={};
+function cleFB(f){return f.tm>0?'tm'+f.tm:'k'+f.k;}
+function surBobine(f){
+  var c=cleFB(f),x=FB[c];
+  if(x&&(x.d||x.attente)&&Date.now()-x.t<120000)return x.attente||Promise.resolve(x.d);
+  if(!sb)return Promise.reject(new Error('hors ligne'));
+  var p=appel('bobine_film_bobine',{p_tm:f.tm>0?f.tm:null,p_cle:f.k}).then(function(d){FB[c]={d:d||{nb:0,critiques:[]},t:Date.now()};return FB[c].d;},function(e){delete FB[c];throw e;});
+  FB[c]={attente:p,t:Date.now()};
+  return p;
+}
+function moyenne(v){return Number(v).toFixed(1).replace('.',',');}
+function lienPseudo(ps){return '<a class="lien-carnet" href="bobine.html?carnet='+encodeURIComponent(ps)+'">'+esc(ps)+'</a>';}
+function ligneStats(d,f){
+  if(!d)return '';
+  var autres=d.nb-(f&&f.w?1:0);
+  if(d.nb<=0||autres<=0&&!d.moy)return '';
+  return 'Noté par '+plural(d.nb,'personne','personnes')+' sur Bobine'+(d.moy?', moyenne '+moyenne(d.moy):'');
+}
+var surbTout=false;
+function htmlSurBobine(f,d){
+  if(!d)return '<h3>Sur Bobine</h3><p class="muted petit">Chargement…</p>';
+  var st=ligneStats(d,f),cr=d.critiques||[];
+  var h='<h3>Sur Bobine</h3><p class="surb-stats">'+(st||(f.w?'Tu es le premier à l’avoir noté sur Bobine.':'Personne ne l’a encore noté sur Bobine.'))+'</p>';
+  if(!cr.length)return h;
+  var vis=surbTout?cr:cr.slice(0,4);
+  h+='<div class="surb-crits">'+vis.map(function(c){
+    return '<div class="surb-c"><div class="surb-h">'+lienPseudo(c.pseudo)+(c.note?'<span class="stars" aria-label="'+ratingWords(c.note)+'">'+stars(c.note)+'</span>':'')+(c.cc?'<span class="heart" aria-label="Coup de cœur">♥</span>':'')+(c.d?'<span class="quand">'+esc(fmtDate(c.d))+'</span>':'')+'</div>'+
+      critique({rv:c.texte,sp:c.sp},'')+'<button class="lien" type="button" data-action="sigcrit" data-n="'+c.n+'">Signaler</button></div>';
+  }).join('')+'</div>';
+  if(cr.length>4&&!surbTout)h+='<button class="ghost small" type="button" data-action="surbtout">Voir les '+(cr.length-4)+' autres critiques</button>';
+  return h;
+}
+function remplirSurBobine(f){
+  var el=$('#sh-bobine');if(!el||!sb)return;
+  var c=FB[cleFB(f)];el.innerHTML=htmlSurBobine(f,c&&c.d);
+  surBobine(f).then(function(d){var e2=$('#sh-bobine');if(e2&&sheetK===f.k)e2.innerHTML=htmlSurBobine(f,d);},function(){var e2=$('#sh-bobine');if(e2)e2.innerHTML='';});
+}
+/* Dans « Noter » : combien de personnes l'ont noté, et la moyenne */
+function statsNoter(f){
+  var el=$('#lf-stats');if(!el)return;el.hidden=true;el.textContent='';
+  if(!f||!sb)return;
+  surBobine(f).then(function(d){var t=ligneStats(d,f);if(t&&$('#log').open){el.textContent=t;el.hidden=false;}},function(){});
+}
+function signalerCritique(n){
+  if(!connecte()){toast('Connecte-toi avec Twitch pour signaler une critique');return;}
+  appel('bobine_signaler_critique',{p_num:+n,p_raison:''}).then(function(){toast('Merci, l’équipe va regarder');},function(e){toast(erreurRpc(e));});
+}
+
+/* ---------- Roulette découverte ----------
+   Selon mes goûts : TMDB recommande des films à partir de ceux que tu as notés de 3,5 à 5 ou mis en coup de cœur.
+   On enlève tout ce que tu as vu ou déjà mis dans À voir, puis on favorise tes genres préférés
+   et les films qui ont une critique sur Bobine. */
+function poidsAime(f){return (f.r||3.5)+(f.l?1:0);}
+function aimes(){return Object.values(S.films).filter(function(f){return f.w&&f.tm>0&&(f.r>=3.5||f.l);});}
+function graines(){
+  var a=aimes(),out=[];
+  while(a.length&&out.length<8){
+    var tot=a.reduce(function(s,f){return s+poidsAime(f)*poidsAime(f);},0),r=Math.random()*tot;
+    for(var i=0;i<a.length;i++){r-=poidsAime(a[i])*poidsAime(a[i]);if(r<=0)break;}
+    out.push(a.splice(Math.min(i,a.length-1),1)[0]);
+  }
+  return out;
+}
+function chargerReco(){
+  if(RL.recoCharge||!TMDB_FN)return;
+  var g=graines();if(!g.length){RL.reco=[];return;}
+  RL.recoCharge=true;RL.graines=g;
+  tmdbGet({reco:g.map(function(f){return f.tm;}).join(',')}).then(function(d){
+    RL.reco=d.reco||[];
+    if(sb&&RL.reco.length)appel('bobine_avec_critiques',{p_tms:RL.reco.map(function(x){return x.id;}).slice(0,200)}).then(function(a){RL.avecCrit=a||[];if(route()==='a-voir')render();},function(){});
+    if(route()==='a-voir')render();
+  },function(){RL.reco=[];RL.recoCharge=false;if(route()==='a-voir')render();});
+}
+function profilGenres(){var g={};aimes().forEach(function(f){(f.g||[]).forEach(function(id){g[id]=(g[id]||0)+poidsAime(f);});});return g;}
+function dejaPris(){var d={};Object.values(S.films).forEach(function(f){if(f.tm&&(f.w||f.wl))d[f.tm]=1;});return d;}
+function candidatsGouts(){
+  if(!RL.reco)return null;
+  var deja=dejaPris(),pg=profilGenres(),tot=Object.values(pg).reduce(function(s,v){return s+v;},0)||1,gr={},crit={};
+  (RL.graines||[]).forEach(function(f){gr[f.tm]=f;});(RL.avecCrit||[]).forEach(function(id){crit[id]=1;});
+  return RL.reco.filter(function(x){return !deja[x.id]&&(x.vc||0)>=20;}).map(function(x){
+    var s=(x.de||[]).length*2+(x.g||[]).reduce(function(a,id){return a+(pg[id]||0);},0)/tot*4+Math.max(0,(x.va||0)-6)+(crit[x.id]?1.5:0);
+    var src=(x.de||[]).map(function(id){return gr[id];}).filter(Boolean).sort(function(a,b){return poidsAime(b)-poidsAime(a);})[0];
+    var f=Object.values(S.films).find(function(y){return y.tm===x.id;})||{k:'tm'+x.id,t:x.t,y:x.y,p:x.p,tm:x.id};
+    return {id:'tm:'+x.id,f:f,poids:s*s,why:src?'Parce que tu as aimé '+src.t:'Une découverte pour toi',tm:{tm:x.id,t:x.t,y:x.y,p:x.p}};
+  }).sort(function(a,b){return b.poids-a.poids;}).slice(0,30);
+}
+/* Le film proposé : sa fiche TMDB (réalisateur, durée) et ce qu'en dit Bobine, chargés une fois */
+var RLF={};
+function rlEnrichir(it){
+  var tm=it.f.tm;if(!tm||RLF[tm])return;RLF[tm]={};
+  var fin=function(){if(route()==='a-voir')render();};
+  if(!it.f.dr||!it.f.m)tmdbGet({id:tm}).then(function(d){if(d&&d.fiche){RLF[tm].fi=d.fiche;fin();}},function(){});
+  if(sb)surBobine({tm:tm,k:'tm'+tm}).then(function(){fin();},function(){});
+}
+function critiqueRoulette(tm){
+  var c=FB['tm'+tm];if(!c||!c.d)return null;
+  var cr=(c.d.critiques||[]).filter(function(x){return !x.sp&&x.texte.length>=20;});
+  var bons=cr.filter(function(x){return !x.note||x.note>=3.5;});
+  var l=(bons.length?bons:cr).slice(0,3);if(!l.length)return null;
+  if(RLF[tm]&&RLF[tm].ci==null)RLF[tm].ci=Math.floor(Math.random()*l.length);
+  return l[(RLF[tm]&&RLF[tm].ci)||0];
+}
+function tronque(s,n){s=String(s||'');return s.length>n?s.slice(0,n).replace(/\s+\S*$/,'')+'…':s;}
+
+/* ---------- Roulette « Je sais pas quoi regarder » : toujours une découverte ----------
+   Jamais un film déjà vu, jamais un film déjà dans ta liste À voir. */
+var RL={mode:'gouts',id:null,tend:null,charge:false,tourne:false,soir:null,reco:null,recoCharge:false,graines:null,avecCrit:null};
+try{RL.soir=localStorage.getItem('bobine.roulette')||null;}catch(e){}
 function candidatsBobine(){
-  return (RL.tend||[]).filter(function(x){return !Object.values(S.films).some(function(f){return f.w&&(f.tm===x.tm);});}).map(function(x){
+  if(!RL.tend)return null;
+  var deja=dejaPris();
+  return RL.tend.filter(function(x){return !deja[x.tm];}).map(function(x){
     var f=Object.values(S.films).find(function(y){return y.tm===x.tm;})||{k:'tm'+x.tm,t:x.t,y:x.y,p:x.p,dr:x.dr,m:x.m,tm:x.tm};
-    var why=x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Note moyenne '+Number(x.moy).toFixed(1).replace('.',',')+' sur Bobine, '+x.nb+' carnets';
+    var why=x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Note moyenne '+moyenne(x.moy)+' sur Bobine, '+x.nb+' carnets';
     return {id:'tm:'+x.tm,f:f,poids:Math.max(.5,Number(x.moy)-2.5),why:why,tm:x};
   });
 }
@@ -681,7 +805,7 @@ function tirer(c,sauf){
 }
 function rlCandidats(){return RL.mode==='gouts'?candidatsGouts():candidatsBobine();}
 function rlCourant(c){
-  if(!c.length)return null;
+  if(!c||!c.length)return null;
   var it=c.find(function(x){return x.id===RL.id;})||(RL.soir&&c.find(function(x){return x.id===RL.soir;}));
   if(!it){it=tirer(c,null);RL.id=it.id;}
   return it;
@@ -689,11 +813,17 @@ function rlCourant(c){
 function roulette(){
   var chip=function(v,l){return '<button type="button" data-action="rlmode" data-v="'+v+'" aria-pressed="'+(RL.mode===v)+'">'+l+'</button>';};
   var c=rlCandidats(),it=null,corps;
-  if(RL.mode==='bobine'&&!RL.tend)corps='<p class="rl-vide">'+(sb?'Chargement des films préférés de Bobine…':'Il faut la connexion au site pour voir les films préférés de Bobine.')+'</p>';
-  else if(!(it=rlCourant(c)))corps='<p class="rl-vide">'+(RL.mode==='gouts'?'Ajoute quelques films à voir et la roulette choisira pour toi.':'Pas encore assez de notes sur Bobine pour ça. Reviens bientôt.')+'</p>';
+  if(!TMDB_FN&&RL.mode==='gouts')corps='<p class="rl-vide">La roulette a besoin de la connexion au site pour chercher des films.</p>';
+  else if(RL.mode==='gouts'&&!aimes().length)corps='<p class="rl-vide">Note quelques films que tu as aimés, de 3,5 à 5 étoiles ou en coup de cœur, et la roulette te fera découvrir des films dans le même esprit.</p>';
+  else if(c===null)corps='<p class="rl-vide">'+(RL.mode==='bobine'&&!sb?'Il faut la connexion au site pour voir les films préférés de Bobine.':'La roulette cherche des films pour toi…')+'</p>';
+  else if(!(it=rlCourant(c)))corps='<p class="rl-vide">'+(RL.mode==='gouts'?'Tu as déjà vu tout ce qu’on avait à te proposer. Note d’autres films que tu as aimés pour élargir la roulette.':'Pas encore assez de notes sur Bobine pour ça. Reviens bientôt.')+'</p>';
   else{
-    var f=it.f,soir=RL.soir===it.id,info=[f.y,f.dr,f.m?fmtDurShort(f.m):''].filter(Boolean).join(', ');
-    corps='<div class="rl-choix'+(RL.tourne?' tourne':'')+'">'+poster(f)+'<div class="rl-txt">'+(soir?'<span class="rl-soir">Ce soir</span>':'')+'<b>'+esc(f.t)+'</b>'+(info?'<span class="rl-info">'+esc(info)+'</span>':'')+'<span class="rl-why">'+esc(it.why)+'</span></div></div>'+
+    rlEnrichir(it);
+    var f=it.f,fi=(RLF[f.tm]&&RLF[f.tm].fi)||{},dr=f.dr||fi.dr,m=f.m||fi.m;
+    var soir=RL.soir===it.id,info=[f.y,dr,m?fmtDurShort(m):''].filter(Boolean).join(', ');
+    var fb=FB['tm'+f.tm],st=fb&&fb.d?ligneStats(fb.d,null):'',cr=critiqueRoulette(f.tm);
+    corps='<div class="rl-choix'+(RL.tourne?' tourne':'')+'">'+poster(f)+'<div class="rl-txt">'+(soir?'<span class="rl-soir">Ce soir</span>':'')+'<b>'+esc(f.t)+'</b>'+(info?'<span class="rl-info">'+esc(info)+'</span>':'')+'<span class="rl-why">'+esc(it.why)+'</span>'+(st?'<span class="rl-stats">'+esc(st)+'</span>':'')+'</div></div>'+
+      (cr?'<figure class="rl-crit"><blockquote>« '+esc(tronque(cr.texte,240))+' »</blockquote><figcaption>'+(cr.note?'<span class="stars" aria-label="'+ratingWords(cr.note)+'">'+stars(cr.note)+'</span>':'')+(cr.cc?'<span class="heart" aria-label="Coup de cœur">♥</span>':'')+'<span>par '+lienPseudo(cr.pseudo)+'</span><button class="lien" type="button" data-action="sigcrit" data-n="'+cr.n+'">Signaler</button></figcaption></figure>':'')+
       '<div class="btnrow">'+(soir?'<button class="primary" type="button" data-action="rlnote">Je l’ai vu, je le note</button>':'<button class="primary" type="button" data-action="rlgo">Je le regarde</button>')+
       (c.length>1?'<button class="ghost" type="button" data-action="rlnext">Relancer</button>':'')+'</div>';
   }
@@ -706,11 +836,12 @@ function chargerTendances(){
 }
 function actionRoulette(act,a){
   var c=rlCandidats(),it=rlCourant(c);
-  if(act==='rlmode'){RL.mode=a.dataset.v;RL.id=null;render();if(RL.mode==='bobine')chargerTendances();return;}
+  if(act==='rlmode'){RL.mode=a.dataset.v;RL.id=null;render();if(RL.mode==='bobine')chargerTendances();else chargerReco();return;}
   if(!it)return;
   if(act==='rlnext'){var n=tirer(c,it.id);RL.id=n.id;RL.tourne=true;render();setTimeout(function(){RL.tourne=false;},700);}
   if(act==='rlgo'){
-    var f=it.tm?filmDepuis({tm:it.tm.tm,t:it.tm.t,y:it.tm.y,p:it.tm.p,dr:it.tm.dr,m:it.tm.m}):it.f;
+    var fi=(RLF[it.f.tm]&&RLF[it.f.tm].fi)||{};
+    var f=it.tm?filmDepuis({tm:it.tm.tm,t:it.tm.t,y:it.tm.y,p:it.tm.p,dr:it.tm.dr||fi.dr,m:it.tm.m||fi.m}):it.f;
     if(f&&!f.w&&!f.wl)f.wl=today();
     RL.soir=it.id;RL.id=it.id;try{localStorage.setItem('bobine.roulette',it.id);}catch(e){}
     commit();toast('Bonne séance !');
@@ -735,37 +866,132 @@ function defis(ys){
     {t:'20 réalisateurs différents',n:Object.keys(dr).length,but:20}
   ];
 }
-function badges(){
-  var films=Object.values(S.films).filter(function(f){return f.w;});
-  var rv=S.diary.filter(function(e){return e.rv;}).length,rw=S.diary.filter(function(e){return e.rw;}).length;
-  var jour={},an={},dr={},vieux=films.some(function(f){var y=parseInt(f.y,10);return y>1870&&y<1950;});
-  S.diary.forEach(function(e){if(e.d){jour[e.d]=(jour[e.d]||0)+1;var y=e.d.slice(0,4);(an[y]=an[y]||{})[e.k]=1;}});
-  films.forEach(function(f){if(f.dr)dr[f.dr]=(dr[f.dr]||0)+1;});
-  var maxJour=Math.max.apply(null,[0].concat(Object.values(jour)));
-  var maxAn=Math.max.apply(null,[0].concat(Object.values(an).map(function(o){return Object.keys(o).length;})));
-  var fan=Object.keys(dr).sort(function(a,b){return dr[b]-dr[a];})[0],nfan=fan?dr[fan]:0;
-  return [
-    {ic:'♥',t:'Premier coup de cœur',s:'Un film qui t’a marqué',ok:films.some(function(f){return f.l;})},
-    {ic:'10',t:'Critique en herbe',s:'10 critiques écrites',ok:rv>=10},
-    {ic:'50',t:'Plume',s:'50 critiques écrites',ok:rv>=50},
-    {ic:'3',t:'Marathon',s:'3 films le même jour',ok:maxJour>=3},
-    {ic:'52',t:'Une année de ciné',s:'52 films en une année',ok:maxAn>=52},
-    {ic:'↻',t:'Fidèle',s:'5 films revus',ok:rw>=5},
-    {ic:'100',t:'Centenaire',s:'100 films vus',ok:films.length>=100},
-    {ic:'5',t:nfan>=5?'Fan de '+fan:'Fan de',s:'5 films du même réalisateur',ok:nfan>=5},
-    {ic:'N&B',t:'Voyageur du temps',s:'Un film d’avant 1950',ok:vieux}
-  ];
-}
 function blocDefis(ys){
   var d=defis(ys),ok=d.filter(function(x){return x.n>=x.but;}).length;
   return '<section class="card-box defis"><div class="cb-tete"><h3>Défis '+ys+'</h3><span class="sub">'+ok+' réussi'+(ok>1?'s':'')+' sur '+d.length+'</span></div>'+
     d.map(function(x){var pct=Math.min(100,x.n/x.but*100);return '<div class="defi'+(x.n>=x.but?' fait':'')+'"><div class="dt"><b>'+esc(x.t)+'</b><span class="sub">'+fmtN(Math.min(x.n,x.but))+' sur '+x.but+'</span></div><div class="jauge" role="progressbar" aria-valuemin="0" aria-valuemax="'+x.but+'" aria-valuenow="'+Math.min(x.n,x.but)+'" aria-label="'+esc(x.t)+'"><i style="width:'+pct.toFixed(1)+'%"></i></div></div>';}).join('')+
     '<p class="muted petit">Ils comptent les films avec une date de visionnage en '+ys+'.</p></section>';
 }
+/* ---------- Badges du moment (obtenus une fois pour toutes) ---------- */
+function badges(){
+  var films=Object.values(S.films).filter(function(f){return f.w;});
+  var rw=S.diary.filter(function(e){return e.rw;}).length;
+  var jour={},an={},vieux=films.some(function(f){var y=parseInt(f.y,10);return y>1870&&y<1950;});
+  S.diary.forEach(function(e){if(e.d){if(e.d.length===10)jour[e.d]=(jour[e.d]||0)+1;var y=e.d.slice(0,4);(an[y]=an[y]||{})[e.k]=1;}});
+  var maxJour=Math.max.apply(null,[0].concat(Object.values(jour)));
+  var maxAn=Math.max.apply(null,[0].concat(Object.values(an).map(function(o){return Object.keys(o).length;})));
+  return [
+    {id:'coeur',ic:'♥',t:'Premier coup de cœur',s:'Un film qui t’a marqué',ok:films.some(function(f){return f.l;})},
+    {id:'marathon',ic:'3',t:'Marathon',s:'3 films le même jour',ok:maxJour>=3},
+    {id:'annee52',ic:'52',t:'Une année de ciné',s:'52 films en une année',ok:maxAn>=52},
+    {id:'fidele',ic:'↻',t:'Fidèle',s:'5 films revus',ok:rw>=5},
+    {id:'temps',ic:'N&B',t:'Voyageur du temps',s:'Un film d’avant 1950',ok:vieux}
+  ];
+}
 function blocBadges(){
-  var b=badges(),n=b.filter(function(x){return x.ok;}).length;
+  var T=trophees(),b=badges().map(function(x){x.ok=x.ok||!!T['b:'+x.id];return x;}),n=b.filter(function(x){return x.ok;}).length;
   return '<section class="badges-box"><div class="cb-tete"><h3>Badges</h3><span class="sub">'+n+' sur '+b.length+'</span></div><div class="badges">'+
     b.map(function(x,i){return '<div class="badge'+(x.ok?' ok b'+(i%3):'')+'"><span class="bi">'+esc(x.ic)+'</span><b>'+esc(x.t)+'</b><span>'+esc(x.s)+'</span></div>';}).join('')+'</div></section>';
+}
+
+/* ---------- Succès de tous les temps, à paliers ---------- */
+var PALIERS=['Bronze','Argent','Or','Platine','Légende'];
+function succes(){
+  var vus=Object.values(S.films).filter(function(f){return f.w;}),min=0,dr={},g={},pa={};
+  vus.forEach(function(f){if(f.m)min+=f.m;if(f.dr)String(f.dr).split(', ').forEach(function(n){dr[n]=1;});(f.g||[]).forEach(function(id){if(GENRES[id]&&id!==10770)g[id]=1;});(f.pa||[]).forEach(function(c){pa[c]=1;});});
+  return [
+    {id:'heures',t:'Heures devant l’écran',n:Math.floor(min/60),p:[100,250,500,1000,2500],u:' h',s:'chaque film compté une fois, sans les revus'},
+    {id:'films',t:'Films vus',n:vus.length,p:[100,250,500,1000,2500]},
+    {id:'reals',t:'Réalisateurs différents',n:Object.keys(dr).length,p:[50,100,250,500]},
+    {id:'genres',t:'Genres explorés',n:Object.keys(g).length,p:[5,10,15,18],s:'sur les 18 genres du cinéma'},
+    {id:'pays',t:'Pays',n:Object.keys(pa).length,p:[5,10,25,50],s:'pays de production des films'},
+    {id:'critiques',t:'Critiques écrites',n:S.diary.filter(function(e){return e.rv;}).length,p:[10,50,100,250,500]},
+    {id:'coeurs',t:'Coups de cœur',n:vus.filter(function(f){return f.l;}).length,p:[10,50,100,250]}
+  ].map(function(x){x.niv=x.p.filter(function(v){return x.n>=v;}).length;return x;});
+}
+function blocSucces(){
+  var T=trophees(),l=succes();
+  return '<section class="card-box succes"><div class="cb-tete"><h3>Succès</h3><span class="sub">depuis ton premier film</span></div><div class="sc-liste">'+
+    l.map(function(x){
+      var niv=Math.max(x.niv,T['s:'+x.id]||0),fini=niv>=x.p.length,but=fini?x.p[x.p.length-1]:x.p[niv],bas=niv?x.p[niv-1]:0;
+      var pct=fini?100:Math.max(0,Math.min(100,(x.n-bas)/(but-bas)*100));
+      return '<div class="sc'+(niv?' n'+Math.min(niv,5):'')+'"><span class="sc-m" aria-hidden="true">'+(niv?niv:'')+'</span><div class="sc-c"><div class="dt"><b>'+esc(x.t)+'</b><span class="sc-niv">'+(niv?PALIERS[niv-1]:'Premier palier à '+fmtN(x.p[0])+(x.u||''))+'</span></div>'+
+        '<div class="jauge" role="progressbar" aria-valuemin="'+bas+'" aria-valuemax="'+but+'" aria-valuenow="'+Math.min(x.n,but)+'" aria-label="'+esc(x.t)+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>'+
+        '<span class="sub">'+fmtN(x.n)+(x.u||'')+(fini?'':' sur '+fmtN(but)+(x.u||''))+(x.s?', '+x.s:'')+'</span></div></div>';
+    }).join('')+'</div></section>';
+}
+
+/* ---------- Réalisateurs : part de la filmographie vue ----------
+   Seulement les réalisateurs d'au moins 5 longs métrages (documentaires compris).
+   Fan dès la moitié, Grand fan aux trois quarts, Filmographie complète à 100 %, et au moins 3 films vus. */
+var NIV_REAL=['Curieux','Fan','Grand fan','Filmographie complète'];
+var FILMO={};try{FILMO=JSON.parse(localStorage.getItem('bobine.filmos')||'{}')||{};}catch(e){FILMO={};}
+var filmoEnCours=false;
+function realsCandidats(){
+  var n={};Object.values(S.films).forEach(function(f){if(f.w&&f.dri)n[f.dri]=(n[f.dri]||0)+1;});
+  return Object.keys(n).filter(function(k){return n[k]>=3;}).sort(function(a,b){return n[b]-n[a];});
+}
+function chargerFilmos(){
+  if(!TMDB_FN||filmoEnCours)return;
+  var vieux=Date.now()-7*864e5,manque=realsCandidats().filter(function(pid){return !FILMO[pid]||FILMO[pid].at<vieux;}).slice(0,24);
+  if(!manque.length)return;
+  filmoEnCours=true;var i=0;
+  (function suivant(){
+    var lot=manque.slice(i,i+4);i+=4;
+    if(!lot.length){filmoEnCours=false;if(route()==='bilan')render();return;}
+    timeout(fetch(TMDB_FN,{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.cle||''},body:JSON.stringify({reals:lot.map(Number)})}).then(function(r){return r.json();}),90000)
+    .then(function(d){
+      (d.filmos||[]).forEach(function(x){FILMO[x.id]={nom:x.nom,films:x.films||[],at:Date.now()};});
+      try{localStorage.setItem('bobine.filmos',JSON.stringify(FILMO));}catch(e){}
+      if(route()==='bilan')render();setTimeout(suivant,300);
+    },function(){filmoEnCours=false;});
+  })();
+}
+function reals(){
+  var vus={};Object.values(S.films).forEach(function(f){if(f.w&&f.tm)vus[f.tm]=1;});
+  return realsCandidats().filter(function(pid){return FILMO[pid]&&FILMO[pid].films.length>=5;}).map(function(pid){
+    var F=FILMO[pid],tot=F.films.length,vu=F.films.filter(function(x){return vus[x.id];}).length,pct=vu/tot;
+    var niv=vu<3?0:pct>=1?3:pct>=.75?2:pct>=.5?1:0;
+    return {pid:pid,nom:F.nom||'?',tot:tot,vu:vu,pct:pct,niv:niv,docs:F.films.filter(function(x){return x.docu;}).length};
+  });
+}
+function blocReals(){
+  var T=trophees(),l=reals().map(function(r){r.garde=Math.max(r.niv,T['r:'+r.pid]||0);return r;});
+  if(!l.length){
+    if(!realsCandidats().length)return '';
+    return '<section class="card-box reals"><h3>Mes réalisateurs</h3><p class="muted petit">'+(TMDB_FN?'Bobine compte les filmographies de tes réalisateurs…':'Il faut la connexion au site pour compter les filmographies.')+'</p></section>';
+  }
+  l.sort(function(a,b){return b.garde-a.garde||b.pct-a.pct||b.vu-a.vu;});
+  var ligne=function(r){
+    var nouveaux=r.garde>r.niv&&r.garde===3?r.tot-r.vu:0,label=r.garde?NIV_REAL[r.garde]:(r.pct>=.25?NIV_REAL[0]:'');
+    return '<div class="real'+(r.garde?' n'+r.garde:'')+'"><div class="dt"><b>'+esc(r.nom)+'</b>'+(label?'<span class="real-niv">'+esc(label)+'</span>':'')+'</div>'+
+      '<div class="jauge" role="progressbar" aria-valuemin="0" aria-valuemax="'+r.tot+'" aria-valuenow="'+r.vu+'" aria-label="Filmographie de '+esc(r.nom)+'"><i style="width:'+(Math.min(1,r.pct)*100).toFixed(1)+'%"></i></div>'+
+      '<span class="sub">'+r.vu+' sur '+r.tot+(r.docs?', documentaires compris':'')+(nouveaux?', '+plural(nouveaux,'nouveau film','nouveaux films')+' depuis':'')+'</span></div>';
+  };
+  var top=l.filter(function(r){return r.garde>0;}).slice(0,3);
+  return '<section class="card-box reals"><div class="cb-tete"><h3>Mes réalisateurs</h3><span class="sub">'+plural(l.filter(function(r){return r.garde>0;}).length,'badge','badges')+'</span></div>'+
+    (top.length?top.map(ligne).join(''):'<p class="muted petit">Vois au moins la moitié des films d’un réalisateur pour décrocher ton premier badge.</p>')+
+    (l.length>top.length?'<details class="reals-tous"><summary>Tous mes réalisateurs ('+l.length+')</summary>'+l.map(ligne).join('')+'</details>':'')+
+    '<p class="muted petit">Longs métrages et documentaires sortis, pour les réalisateurs d’au moins 5 films.</p></section>';
+}
+
+/* ---------- Trophées gardés : un succès obtenu reste obtenu ---------- */
+var reglagesOk=false;
+function trophees(){
+  if(LECTURE)return {};
+  if(Store.mode==='db')return reglages.trophees||{};
+  try{return JSON.parse(localStorage.getItem('bobine.trophees')||'{}')||{};}catch(e){return {};}
+}
+function garderTrophees(){
+  if(LECTURE||Store.mode==='db'&&!reglagesOk)return;
+  var T=trophees(),nv={};
+  succes().forEach(function(x){if(x.niv>(T['s:'+x.id]||0))nv['s:'+x.id]=x.niv;});
+  reals().forEach(function(r){if(r.niv>(T['r:'+r.pid]||0))nv['r:'+r.pid]=r.niv;});
+  badges().forEach(function(b){if(b.ok&&!T['b:'+b.id])nv['b:'+b.id]=1;});
+  if(!Object.keys(nv).length)return;
+  var tout=Object.assign({},T,nv);
+  if(Store.mode==='db'){reglages.trophees=tout;appel('bobine_garder_trophees',{p:nv}).catch(function(){});}
+  else{try{localStorage.setItem('bobine.trophees',JSON.stringify(tout));}catch(e){}}
 }
 
 /* ---------- Carte illimitée : visible par toi seul ----------
@@ -819,7 +1045,18 @@ document.addEventListener('submit',function(ev){
 function majCaseCarte(){var b=$('#lf-ca-box');if(b)b.hidden=!carteCfg();}
 function chargerReglages(){
   if(!sb||Store.mode!=='db')return;
-  sb.rpc('bobine_reglages').then(function(r){if(!r.error&&r.data){reglages=r.data;majCaseCarte();if(route()==='bilan')render();}});
+  sb.rpc('bobine_reglages').then(function(r){if(!r.error&&r.data){reglages=r.data;reglagesOk=true;majCaseCarte();infoCarnets();if(route()==='bilan')render();}});
+}
+
+/* ---------- 1.8 : prévenir une fois que les carnets sont visibles entre membres ---------- */
+function infoCarnets(){
+  if(LECTURE||Store.mode!=='db'||reglages.prive)return;
+  try{if(localStorage.getItem('bobine.info18'))return;localStorage.setItem('bobine.info18','1');}catch(e){return;}
+  $('#info-body').innerHTML='<p>Bobine devient un vrai coin de cinéphiles. Ton carnet est maintenant visible par les autres membres, depuis ton pseudo dans le forum et sous tes critiques, dans la fiche des films et dans la roulette.</p>'+
+    '<p>Rien d’autre que ton carnet. Bobine ne garde jamais où tu as vu un film, et ta carte illimitée reste visible par toi seul.</p>'+
+    '<p>Tu préfères rester dans ton coin ? Passe ton carnet en privé, il disparaît de partout. Tu peux changer d’avis quand tu veux dans ton compte.</p>'+
+    '<div class="df"><button class="ghost" type="button" data-action="infoprive">Passer en privé</button><span class="sp"></span><button class="primary" type="button" data-action="close">Compris</button></div>';
+  setTimeout(function(){if(!$$('dialog[open]').length)showDialog($('#info'));},900);
 }
 
 /* ---------- Ton année en story ---------- */
@@ -961,7 +1198,8 @@ function ticket(e,f,example){
   var nouveau=!example&&e.id===dernierAjout;
   var attrs=example?'':' data-action="edit" data-id="'+esc(e.id)+'" tabindex="0" role="button" aria-label="Modifier la séance de '+esc(f.t)+'"';
   return '<article class="ticket'+(example?' example':'')+(nouveau?' nouveau':'')+'"'+attrs+'>'+
-    (e.d?'<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>':'<div class="stub nodate"><span class="mon">vu</span></div>')+
+    (/^\d{4}$/.test(e.d||'')?'<div class="stub annee"><span class="mon">en</span><span class="day">'+esc(e.d)+'</span></div>':
+     e.d?'<div class="stub"><span class="day">'+(p[2]?+p[2]:'?')+'</span><span class="mon">'+(p[1]?MOIS_C[+p[1]-1]:'')+'</span><span class="yr">'+(p[0]||'')+'</span></div>':'<div class="stub nodate"><span class="mon">vu</span></div>')+
     '<div class="tbody"><h4>'+esc(f.t)+' <span class="fy">'+esc(f.y)+'</span></h4>'+
     '<div class="meta">'+(e.r?'<span class="stars" aria-label="'+ratingWords(e.r)+'">'+stars(e.r)+'</span>':'')+(e.l?'<span class="heart" aria-label="Coup de cœur">♥</span>':'')+(e.rw?'<span class="tag">revu</span>':'')+((f.m||e.m)?'<span class="dur-tag">'+fmtDurShort(f.m||e.m)+'</span>':'')+(example?'<span class="tag ex">exemple</span>':'')+'</div>'+
     (e.rv?critique(e,'rv'):'')+'</div>'+poster(f,'mini')+'</article>';
@@ -1052,7 +1290,7 @@ bilan:function(){
     '<span class="lbl">depuis ton premier film'+(days>=1?', soit '+days.toFixed(1).replace('.',',')+' jours':'')+(st.unknown?', durée inconnue pour '+plural(st.unknown,'séance','séances'):'')+'</span></section>'+
     '<div class="tiles">'+
     tile(fmtN(films.length),'films vus')+tile(avg?avg.toFixed(2).replace('.',','):'–','note moyenne sur 5')+tile(fmtN(likes),'coups de cœur')+tile(fmtN(rv),'critiques écrites')+'</div>'+
-    blocDefis(ys)+blocBadges()+blocCarte();
+    blocDefis(ys)+blocReals()+blocSucces()+blocBadges()+blocCarte();
   // distribution des notes
   var dist=[0,0,0,0,0,0,0,0,0,0];rated.forEach(function(f){var i=Math.round(f.r*2)-1;if(i>=0&&i<10)dist[i]++;});
   var maxI=dist.indexOf(Math.max.apply(null,dist));
@@ -1098,7 +1336,8 @@ manifeste:function(){
   '<div><span class="st ok">Fait</span><span>Forum et conversation privée avec l’équipe</span></div>'+
   '<div><span class="st ok">Fait</span><span>Fond crème ou sombre, couleurs au choix, spoilers floutés</span></div>'+
   '<div><span class="st ok">Fait</span><span>Ton année en story, défis et badges, roulette À voir, carte illimitée</span></div>'+
-  '<div><span class="st">Ensuite</span><span>Signaler ou bloquer un carnet, mentions légales, ouverture au public de Twitch</span></div>'+
+  '<div><span class="st ok">Fait</span><span>Carnets visibles entre membres, moyenne et critiques de Bobine sur chaque film, roulette découverte, réalisateurs et succès</span></div>'+
+  '<div><span class="st">Ensuite</span><span>Mentions légales, ouverture au public de Twitch</span></div>'+
   '<div><span class="st">Plus tard</span><span>Ton carnet lisible depuis Mastodon et le reste du fédivers</span></div>'+
   '</div></section>'+
   '<section class="card-box" id="nouveautes"><h3>Nouveautés</h3><div class="roadmap">'+
@@ -1113,7 +1352,7 @@ confidentialite:function(){
   '<p class="lead">Bobine garde le strict nécessaire, et tu peux tout reprendre ou tout effacer quand tu veux.</p>'+
   '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, utilise Écrire à l’équipe, depuis le Forum.</p></section>'+
   '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Si tu règles une carte illimitée, son prix et les séances vues avec. Ces deux infos ne sont visibles que par toi, jamais sur ton carnet public.</p><p>Tes messages sur le forum, publics et signés de ton pseudo, et ta conversation avec l’équipe, que seuls toi et l’équipe lisez. Il n’y a pas de messages privés entre membres.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
-  '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Ton carnet est public, mais seulement pour qui a son lien. Il n’y a pas d’annuaire des membres, pas de recherche de profils et pas de référencement sur Google.</p><p>Tu peux le passer en privé à tout moment depuis ton compte. Un carnet privé n’est plus visible par personne d’autre que toi.</p><p>La roulette « Les mieux notés de Bobine » fait des moyennes à partir des carnets publics, avec au moins deux carnets par film. Elle ne montre jamais qui a mis quelle note, et les carnets privés n’y comptent pas.</p></section>'+
+  '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Bobine est fait pour partager ton carnet de cinéphile. Il est visible par les autres membres, depuis ton pseudo dans le forum, sous tes critiques dans la fiche d’un film et dans la roulette, et par toute personne à qui tu donnes son lien.</p><p>Bobine ne garde jamais où tu as vu un film. Pas de lieu, pas de cinéma, pas d’adresse. Ta carte illimitée et ses séances restent visibles par toi seul.</p><p>Les carnets ne sont pas référencés sur Google.</p><p>Tu préfères rester dans ton coin ? Passe ton carnet en privé depuis ton compte. Il disparaît alors de partout, des moyennes, des critiques, de la roulette et du forum, et plus personne d’autre que toi ne peut le lire.</p><p>Une critique qui pose problème peut être signalée, et l’équipe peut la masquer.</p></section>'+
   '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base, sur des serveurs en Irlande, dans l’Union européenne. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
   '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement depuis ton compte, ce qui efface aussi tes messages du forum et ta conversation avec l’équipe. Pour effacer aussi ton compte Twitch relié, écris à l’équipe.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
   '</article>';
@@ -1334,10 +1573,21 @@ function montrerDate(oui){
   $('#lf-d-box').hidden=!oui;$('#lf-d-add').hidden=oui;
   if(oui&&!$('#lf-d').value)$('#lf-d').value=today();
 }
+/* La date peut être le jour exact ou juste l'année, quand on ne se souvient plus du jour */
+var precDate='jour';
+function remplirAnnees(){var sl=$('#lf-an');if(sl.options.length)return;var y=new Date().getFullYear(),h='';for(var i=y;i>=1920;i--)h+='<option value="'+i+'">'+i+'</option>';sl.innerHTML=h;}
+function choisirPrec(p){
+  precDate=p;remplirAnnees();
+  $$('#lf-d-box [data-prec]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.prec===p));});
+  $('#lf-d').hidden=p!=='jour';$('#lf-an').hidden=p!=='annee';
+  if(p==='annee'){var v=($('#lf-d').value||today()).slice(0,4);$('#lf-an').value=v;}
+  else if(!$('#lf-d').value)$('#lf-d').value=today();
+}
+$$('#lf-d-box [data-prec]').forEach(function(b){b.addEventListener('click',function(){choisirPrec(b.dataset.prec);if(b.dataset.prec==='annee'&&$('#lf-ca').checked)$('#lf-ca').checked=false;});});
 $('#lf-d-add').addEventListener('click',function(){montrerDate(true);$('#lf-d').focus();});
 $('#lf-d-del').addEventListener('click',function(){$('#lf-d').value='';montrerDate(false);});
 /* Vu avec ma carte : la séance a forcément un jour, proposé à aujourd'hui */
-$('#lf-ca').addEventListener('change',function(){if(this.checked&&$('#lf-d-box').hidden)montrerDate(true);});
+$('#lf-ca').addEventListener('change',function(){if(!this.checked)return;if($('#lf-d-box').hidden)montrerDate(true);if(precDate!=='jour')choisirPrec('jour');});
 function openLog(o){
   o=o||{};
   var e=o.id?S.diary.find(function(x){return x.id===o.id;}):null;
@@ -1345,12 +1595,14 @@ function openLog(o){
   logCtx={id:e?e.id:null};
   $('#log-title').textContent=e?'Modifier la séance':'Noter un film';
   $('#lf-t').value=f?f.t:'';$('#lf-y').value=f?f.y:'';
-  $('#lf-d').value=e?(e.d||''):'';montrerDate(!!(e&&e.d));
+  var an=e&&/^\d{4}$/.test(e.d||'');
+  $('#lf-d').value=e&&!an?(e.d||''):'';montrerDate(!!(e&&e.d));choisirPrec(an?'annee':'jour');if(an)$('#lf-an').value=e.d;
   $('#lf-m').value=f&&f.m?fmtDurShort(f.m):'';
   $('#lf-l').checked=e?!!e.l:!!(f&&f.l);
   $('#lf-rw').checked=e?!!e.rw:!!(f&&S.diary.some(function(x){return x.k===f.k;}));
   $('#lf-rv').value=e?(e.rv||''):'';$('#lf-sp').checked=!!(e&&e.sp);
   majCaseCarte();$('#lf-ca').checked=!!(e&&e.ca);
+  statsNoter(f);
   $('#lf-tg').value=e?(e.tg||''):'';
   getRating=picker($('#lf-r'),e?(e.r||0):0);
   $('#lf-del').hidden=!e;$('#lf-share').hidden=!e;$('#lf-confirm').hidden=true;$('#lf-err').textContent='';
@@ -1368,12 +1620,12 @@ $('#logform').addEventListener('submit',function(ev){
   if(y&&!/^\d{4}$/.test(y)){err.textContent='L’année s’écrit avec 4 chiffres, par exemple 1984.';$('#lf-y').focus();return;}
   var mm=parseDur($('#lf-m').value);
   if(mm<0||mm>1500){err.textContent='Durée non comprise. Écris par exemple 1h20, 80 ou 1:20.';$('#lf-m').focus();return;}
-  var d=$('#lf-d-box').hidden?'':($('#lf-d').value||''),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim(),sp=!!rv&&$('#lf-sp').checked,ca=!$('#lf-ca-box').hidden&&$('#lf-ca').checked&&!!d;
+  var d=$('#lf-d-box').hidden?'':precDate==='annee'?($('#lf-an').value||''):($('#lf-d').value||''),r=getRating()||null,l=$('#lf-l').checked,rw=$('#lf-rw').checked,rv=$('#lf-rv').value.trim(),tg=$('#lf-tg').value.trim(),sp=!!rv&&$('#lf-sp').checked,ca=!$('#lf-ca-box').hidden&&$('#lf-ca').checked&&d.length===10;
   var tm=logCtx.tmdb&&logCtx.tmdb.t===t&&logCtx.tmdb.y===y?logCtx.tmdb:null,f=null;
   if(tm)f=Object.values(S.films).find(function(x){return x.tm===tm.id;})||null;
   if(!f&&!tm&&!y){var memes=Object.values(S.films).filter(function(x){return norm(x.t)===norm(t);});if(memes.length===1)f=memes[0];}
   if(!f)f=ensureFilm(t,y);
-  if(tm){f.tm=tm.id;if(tm.p)f.p=tm.p;if(tm.dr)f.dr=tm.dr;if(!mm&&tm.m&&!f.m)f.m=tm.m;}
+  if(tm){f.tm=tm.id;if(tm.p)f.p=tm.p;if(tm.dr)f.dr=tm.dr;if(!mm&&tm.m&&!f.m)f.m=tm.m;if(tm.fi)appliquerFiche(f,tm.fi);}
   f.w=true;f.wl=null;if(r)f.r=r;if(l)f.l=true;if(mm)f.m=mm;
   if(logCtx.id){var e=S.diary.find(function(x){return x.id===logCtx.id;});if(e){var etaitCoeur=e.l;e.k=f.k;e.d=d;e.r=r;e.l=l;e.rw=rw;e.rv=rv;e.tg=tg;e.sp=sp;e.ca=ca;if(l&&!etaitCoeur)allumerAmpoules();}}
   else{var nid=uid();S.diary.push({id:nid,k:f.k,d:d,r:r,l:l,rw:rw,rv:rv,tg:tg,ts:Date.now(),sp:sp,ca:ca});dernierAjout=nid;if(l)allumerAmpoules();}
@@ -1384,7 +1636,7 @@ $('#logform').addEventListener('submit',function(ev){
 
 /* ---------- Dialogue : fiche film ---------- */
 var sheetK=null,sheetConfirm=false;
-function openSheet(k){if(!film(k))return;sheetK=k;sheetConfirm=false;renderSheet();showDialog($('#sheet'));}
+function openSheet(k){if(!film(k))return;sheetK=k;sheetConfirm=false;surbTout=false;renderSheet();showDialog($('#sheet'));}
 function renderSheet(){
   var f=film(sheetK);if(!f){closeDialog($('#sheet'));return;}
   var ent=S.diary.filter(function(e){return e.k===f.k;}).sort(function(a,b){return (b.d||'').localeCompare(a.d||'');});
@@ -1398,9 +1650,11 @@ function renderSheet(){
    '<button class="primary" type="button" data-action="logk">+ Ajouter une séance</button>'+
    (S.lists.length?'<div class="fld"><span>Listes</span>'+(inL.length?'<p class="muted" style="margin:0;font-size:14px">Dans '+inL.join(', ')+'</p>':'')+(opts?'<div class="addlist"><select id="sh-list" aria-label="Choisir une liste">'+opts+'</select><button class="ghost" type="button" data-action="tolist">Ajouter</button></div>':'')+'</div>':'')+
    '<div class="fld"><span>Séances</span>'+(ent.length?'<div class="entries">'+ent.map(function(e){return '<div class="entry"><div class="eh"><span class="ed">'+(fmtDate(e.d)||'Vu')+(e.rw?', revu':'')+'</span><span>'+(e.r?'<span class="stars">'+stars(e.r)+'</span> ':'')+(e.l?'<span class="heart">♥</span> ':'')+'<button class="ghost small" type="button" data-action="share" data-id="'+esc(e.id)+'">Partager</button> <button class="ghost small" type="button" data-action="edit" data-id="'+esc(e.id)+'">Modifier</button></span></div>'+(e.rv?critique(e,''):'')+'</div>';}).join('')+'</div>':'<p class="muted" style="margin:0;font-size:14px">Dans tes films vus. Note-le pour qu’il entre dans ton journal.</p>')+'</div>'+
+   (sb?'<section class="surb" id="sh-bobine" aria-live="polite"></section>':'')+
    (sheetConfirm?'<div class="confirm">Retirer ce film et ses séances du carnet ? <button class="primary small" type="button" data-action="fkill">Oui, retirer</button><button class="ghost small" type="button" data-action="fnokill">Non</button></div>':'<div><button class="ghost danger small" type="button" data-action="faskkill">Retirer du carnet</button></div>')+
    '</div>';
   picker($('#sh-r'),f.r||0,function(v){f.r=v||null;f.w=true;commit();});
+  remplirSurBobine(f);
 }
 
 /* ---------- Import Letterboxd ---------- */
@@ -1489,7 +1743,7 @@ function wireDrop(){
 function exportCSV(){
   var rows=[],inDiary={};
   S.diary.slice().sort(function(a,b){return (a.d||'').localeCompare(b.d||'');}).forEach(function(e){var f=film(e.k);if(!f)return;inDiary[e.k]=1;
-    rows.push({Title:f.t,Year:f.y,Rating:e.r||'',WatchedDate:e.d||'',Rewatch:e.rw?'Yes':'',Review:e.rv||'',Tags:e.tg||''});});
+    rows.push({Title:f.t,Year:f.y,Rating:e.r||'',WatchedDate:(e.d||'').length===10?e.d:'',Rewatch:e.rw?'Yes':'',Review:e.rv||'',Tags:e.tg||''});});
   Object.values(S.films).forEach(function(f){if(f.w&&!inDiary[f.k])rows.push({Title:f.t,Year:f.y,Rating:f.r||'',WatchedDate:'',Rewatch:'',Review:'',Tags:''});});
   return Papa.unparse(rows,{columns:['Title','Year','Rating','WatchedDate','Rewatch','Review','Tags']});
 }
@@ -1541,7 +1795,7 @@ document.addEventListener('click',function(ev){
   ev.preventDefault();location.hash='#manifeste';
   setTimeout(function(){var n=$('#nouveautes');if(n)n.scrollIntoView({behavior:'smooth',block:'start'});},150);
 });
-var EN_LECTURE={spoil:1,apparence:1,theme:1,accent:1,close:1,more:1,gmore:1,ffilter:1,sheet:1,lopen:1,lback:1,compte:1};
+var EN_LECTURE={sigcrit:1,surbtout:1,spoil:1,apparence:1,theme:1,accent:1,close:1,more:1,gmore:1,ffilter:1,sheet:1,lopen:1,lback:1,compte:1};
 document.addEventListener('click',function(ev){
   var a=ev.target.closest('[data-action]');if(!a)return;
   var act=a.dataset.action,L;
@@ -1589,15 +1843,18 @@ document.addEventListener('click',function(ev){
     case 'apparence':ouvrirApparence();break;
     case 'dem':ouvrirDem();break;
     case 'storyan':openShareAnnee(a.dataset.y);break;
+    case 'infoprive':closeDialog($('#info'));ouvrirCompte();break;
     case 'carteedit':carteEdit=true;render();setTimeout(function(){var i=$('#carteform input');if(i)i.focus();},0);break;
     case 'cartenon':carteEdit=false;render();break;
     case 'cartesuppr':enregistrerCarte(null,null);break;
     case 'rlmode':case 'rlnext':case 'rlgo':case 'rlnote':actionRoulette(act,a);break;
+    case 'sigcrit':signalerCritique(a.dataset.n);break;
+    case 'surbtout':surbTout=true;var fs=film(sheetK);if(fs){var cs=FB[cleFB(fs)];$('#sh-bobine').innerHTML=htmlSurBobine(fs,cs&&cs.d);}break;
     case 'lwl':var f5=film(a.dataset.k);if(f5&&!f5.w){f5.wl=today();commit();toast('« '+f5.t+' » ajouté à À voir');}break;
     case 'theme':choisirApparence(a.dataset.v,null);break;
     case 'accent':choisirApparence(null,a.dataset.v);break;
     case 'compte':case 'cptcopie':case 'cptsuppr':case 'cptnon':actionCompte(act);break;
-    case 'fzfiltre':case 'fzsuppr':case 'fzsignal':case 'fzmod':case 'fztraite':case 'fzban':case 'fzregle':case 'fzrouvrir':case 'fzsupconv':case 'fzsupconvok':actionForum(act,a);break;
+    case 'fzfiltre':case 'fzsuppr':case 'fzsignal':case 'fzmod':case 'fztraite':case 'fzban':case 'fzregle':case 'fzrouvrir':case 'fzsupconv':case 'fzsupconvok':case 'fzcrit':actionForum(act,a);break;
   }
 });
 window.addEventListener('beforeunload',function(ev){if(Store.mode==='db'&&(Store.saving||$('#sync').dataset.s==='pending')){flush();ev.preventDefault();ev.returnValue='';}});

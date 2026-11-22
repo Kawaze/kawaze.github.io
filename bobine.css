@@ -558,3 +558,65 @@ button.annee .primary{background:var(--accent);color:var(--on-accent);pointer-ev
 .ghost.ok{color:#1e6a4c;border-color:#1e6a4c}
 :root[data-theme="dark"] .regle b,:root[data-theme="dark"] .ghost.ok{color:#5cc99e;border-color:#5cc99e}
 @media (max-width:420px){.tabs ul{padding:0 4px}.tabs a{padding:13px 7px 11px;font-size:14px;letter-spacing:.05em}}
+
+/* ---------- 1.8 : date à l'année ---------- */
+.stub.annee .mon{margin:0 0 4px;color:var(--muted)}
+.stub.annee .day{font-size:22px;letter-spacing:.02em}
+.dprec{display:flex;gap:3px;background:var(--line);border-radius:9px;padding:3px;margin-bottom:8px}
+.dprec button{flex:1;border:0;background:transparent;border-radius:7px;padding:8px;font:600 13px/1 var(--body);color:var(--muted);cursor:pointer}
+.dprec button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+#lf-an[hidden],#lf-d[hidden]{display:none!important}
+#lf-an{flex:1}
+
+/* ---------- Sur Bobine ---------- */
+.lf-stats{margin:-4px 0 0;font:500 12.5px/1.4 var(--mono);color:var(--muted)}
+.lf-stats[hidden]{display:none}
+.surb{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px}
+.surb h3{font:800 20px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;margin:0}
+.surb-stats{margin:0;font-size:14px;color:var(--muted)}
+.surb-crits{display:grid;gap:10px}
+.surb-c{background:var(--bg);border-radius:10px;padding:10px 12px}
+.surb-c p{margin:6px 0 4px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.surb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.surb-h .quand{font:500 11.5px/1 var(--mono);color:var(--muted);margin-left:auto}
+.lien-carnet{color:var(--ink);font-weight:700;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.lien-carnet:hover{text-decoration-color:var(--accent)}
+.msg-tete .lien-carnet{color:inherit}
+.surb-c .spoiler,.rl-crit .spoiler{margin:6px 0 4px}
+
+/* ---------- Roulette : stats et critique ---------- */
+.rl-stats{font:500 12px/1.35 var(--mono);color:#cfcac0}
+.rl-crit{margin:0;background:#1c1d23;border-radius:10px;padding:12px 14px;display:grid;gap:8px}
+.rl-crit blockquote{margin:0;font-size:14.5px;line-height:1.45;color:var(--marquee-ink);overflow-wrap:anywhere}
+.rl-crit figcaption{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#cfcac0}
+.rl-crit .lien-carnet{color:var(--marquee-ink);text-decoration-color:#55565e}
+.rl-crit .lien{margin-left:auto;color:#9d988e}
+.rl-crit .stars{color:var(--bulb)}
+
+/* ---------- Succès à paliers ---------- */
+.sc-liste{display:grid;gap:12px}
+.sc{display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:center}
+.sc-m{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font:900 17px/1 var(--display);background:var(--line);color:var(--muted);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--line)}
+.sc.n1 .sc-m{background:#b0703c;color:#fff;box-shadow:0 0 0 2px var(--surface),0 0 0 4px #b0703c}
+.sc.n2 .sc-m{background:#8e959c;color:#fff;box-shadow:0 0 0 2px var(--surface),0 0 0 4px #8e959c}
+.sc.n3 .sc-m{background:#c99a12;color:#fff;box-shadow:0 0 0 2px var(--surface),0 0 0 4px #c99a12}
+.sc.n4 .sc-m{background:#5b8fa8;color:#fff;box-shadow:0 0 0 2px var(--surface),0 0 0 4px #5b8fa8}
+.sc.n5 .sc-m{background:var(--accent);color:var(--on-accent);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.sc-c{display:grid;gap:5px;min-width:0}
+.sc-c .dt{display:flex;justify-content:space-between;gap:10px;font-size:14.5px;flex-wrap:wrap}
+.sc-niv{font:600 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sc-c .sub{font-size:12px}
+
+/* ---------- Mes réalisateurs ---------- */
+.real{display:grid;gap:6px;margin-bottom:14px}
+.real .dt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:15px}
+.real-niv{font:600 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.real.n1 .real-niv{color:var(--accent)}
+.real.n2 .real-niv{color:var(--gold)}
+.real.n3 .real-niv{color:var(--gold)}
+.real.n3 .jauge i{background:var(--gold)}
+.real .sub{font-size:12px}
+.reals-tous{margin:4px 0 8px}
+.reals-tous summary{cursor:pointer;font:700 14px/1.4 var(--body);padding:6px 0;color:var(--ink)}
+.reals-tous[open] summary{margin-bottom:10px}
+#info .dbody p{margin:0;line-height:1.5}
