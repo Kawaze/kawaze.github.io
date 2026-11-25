@@ -5,8 +5,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var MOIS_C=['JANV','FÉVR','MARS','AVR','MAI','JUIN','JUIL','AOÛT','SEPT','OCT','NOV','DÉC'];
 var MOIS_I=['J','F','M','A','M','J','J','A','S','O','N','D'];
 var PAL=['#2c3b57','#7b2d33','#35553e','#6d5216','#4b2d55','#1d5160','#8b3d17','#3a3a40','#5d3b2c','#3a4b80','#5a5f2a','#6a2c4a'];
-var VERSION='1.8.2';
+var VERSION='1.8.3';
 var NOUVEAUTES=[
+  ['1.8.3','Le logo de Bobine dans l’onglet, en bas du site et sur les stories, une roulette qui part de tous tes films aimés et ne tourne plus en rond, et des stats de fréquentation pour l’admin avec un compteur en direct'],
   ['1.8.2','La roulette part des notes et critiques des membres de Bobine, et le top 5 de Bobine arrive dans À voir'],
   ['1.8.1','Nouveautés repliées dans le Manifeste, feuille de route mise à jour'],
   ['1.8','Carnets visibles depuis le forum et les critiques, Sur Bobine avec la moyenne et les critiques des membres, roulette découverte, réalisateurs et succès, date à l’année'],
@@ -143,7 +144,36 @@ function connect(){
     if(ev==='INITIAL_SESSION'||id!==Store.user)setTimeout(function(){changerCompte(id);},0);
   });
 }
+/* ---------- Stats de fréquentation : une visite par ouverture de Bobine, sans traceur ---------- */
+function compterUneFois(cle,quoi,carnet){
+  if(!sb)return;
+  try{if(sessionStorage.getItem(cle))return;sessionStorage.setItem(cle,'1');}catch(e){return;}
+  sb.rpc('bobine_compter',{p_quoi:quoi,p_carnet:carnet||null}).then(function(){},function(){});
+}
+/* ---------- En ce moment sur Bobine : compteur en direct (Supabase Presence) ----------
+   Chaque page ouverte dit seulement « membre ou pas » et « où » (site, carnet, forum).
+   Rien n'est enregistré, et la connexion se coupe quand l'onglet reste en arrière-plan. */
+var PRES={ch:null,cle:null,timer:null,cb:null,ou:null};
+function presOu(){var r=route();return LECTURE?'carnet':(r==='forum'||r==='contact'||r==='admin')?'forum':'site';}
+function presCharge(){PRES.ou=presOu();return {m:Store.mode==='db'?1:0,ou:PRES.ou};}
+function presRejoindre(){
+  if(!sb||typeof sb.channel!=='function'||PRES.ch||document.hidden)return;
+  try{
+    PRES.cle=PRES.cle||Math.random().toString(36).slice(2)+Date.now().toString(36);
+    var ch=sb.channel('bobine-en-ligne',{config:{presence:{key:PRES.cle}}});
+    ch.on('presence',{event:'sync'},function(){if(PRES.cb)PRES.cb(ch.presenceState());});
+    ch.subscribe(function(st){if(st==='SUBSCRIBED')ch.track(presCharge());});
+    PRES.ch=ch;
+  }catch(e){PRES.ch=null;}
+}
+function presQuitter(){if(!PRES.ch)return;var ch=PRES.ch;PRES.ch=null;try{sb.removeChannel(ch);}catch(e){}}
+function presMaj(force){if(PRES.ch&&(force||presOu()!==PRES.ou))try{PRES.ch.track(presCharge());}catch(e){}}
+document.addEventListener('visibilitychange',function(){
+  clearTimeout(PRES.timer);
+  if(document.hidden)PRES.timer=setTimeout(presQuitter,60000);else presRejoindre();
+});
 function changerCompte(id){
+  setTimeout(function(){compterUneFois('bobine.vis','visite');presRejoindre();presMaj(true);},1200);
   if(!id){
     if(Store.mode==='db'){lsDel('bobine.compte.'+Store.user);Store.mode='local';Store.user=null;Store.profil=null;Store.last=null;reglages={prive:false};reglagesOk=false;S=upgrade(lsGet(LS));render();}
     FZ.notifs={admin:false,contact:0,a_traiter:0};setStatus('local');renderCompte();renderTabs();setTimeout(rattraper,1500);return;
@@ -360,7 +390,7 @@ function chargerNotifs(){
 /* Le forum vit à part : bouton en haut à droite, retour au carnet, onglets Forum, équipe et Admin */
 function fzNav(actif){
   var o=[['forum','Le forum',0],['contact','Écrire à l’équipe',FZ.notifs.contact]];
-  if(FZ.notifs.admin)o.push(['admin','Admin',FZ.notifs.a_traiter]);
+  if(FZ.notifs.admin){o.push(['admin','Admin',FZ.notifs.a_traiter]);o.push(['admin/stats','Stats',0]);}
   return '<p class="fz-carnet"><a href="#journal">← Mon carnet</a></p><nav class="fz-nav" aria-label="Forum">'+o.map(function(x){return '<a href="#'+x[0]+'"'+(x[0]===actif?' aria-current="page"':'')+'>'+x[1]+pastille(x[2])+'</a>';}).join('')+'</nav>';
 }
 function vueForum(){
@@ -438,6 +468,7 @@ function bulles(msgs,cote){
 function vueAdmin(){
   if(!FZ.notifs.admin)return '<div class="card-box"><h3>Réservé à l’équipe</h3></div>';
   var p=routeParam();
+  if(p==='stats')return fzNav('admin/stats')+'<div class="viewhead"><h2>Stats</h2><p class="sub">visible par toi seul</p></div><div id="fz-stats"><p class="muted">Chargement…</p></div>';
   if(p)return '<p class="fz-retour"><a href="#admin">← Admin</a></p><div id="fz"><p class="muted">Chargement…</p></div>';
   return fzNav('admin')+'<div class="viewhead"><h2>Admin</h2><p class="sub">visible par toi seul</p></div>'+
     '<section class="card-box"><h3>Messages privés</h3><div id="fz-conv"><p class="muted">Chargement…</p></div></section>'+
@@ -462,6 +493,33 @@ function remplirConvAdmin(){
     bulles(x.messages,'admin')+regleAdmin(x)+
     (FZ.adm.regle?'':'<form class="fz-form" id="fz-admrep"><label class="fld"><span>Ta réponse</span><textarea name="t" rows="4" maxlength="4000" required></textarea></label><div class="df"><span class="sp"></span><button class="primary" type="submit">Répondre</button></div></form>');
 }
+/* ---- Stats ---- */
+function remplirStats(d){
+  var el=$('#fz-stats');if(!el||!d)return;
+  var J=d.jours||[],som=function(cle,n){return J.slice(-n).reduce(function(s,x){return s+(x[cle]||0);},0);};
+  var tuile=function(v,l){return '<div class="tile"><b>'+fmtN(v)+'</b><span>'+l+'</span></div>';};
+  var max=Math.max.apply(null,[1].concat(J.map(function(x){return x.visite+x.anonyme;})));
+  var barres=J.map(function(x){var t=x.visite+x.anonyme,dd=new Date(x.j+'T12:00:00');
+    return '<div class="st-j" title="'+esc(fmtDate(x.j))+', '+t+' visites"><div class="st-b"><i class="anon" style="height:'+(x.anonyme/max*100).toFixed(1)+'%"></i><i style="height:'+(x.visite/max*100).toFixed(1)+'%"></i></div><span>'+(dd.getDate()===1||J.indexOf(x)%7===6?dd.getDate():'')+'</span></div>';}).join('');
+  el.innerHTML=
+    '<section class="card-box st-direct"><h3>En ce moment sur Bobine</h3><div id="st-live" aria-live="polite"><p class="muted">Connexion au compteur…</p></div></section>'+
+    '<section class="card-box"><h3>Membres</h3><div class="tiles">'+tuile(d.membres,'comptes Bobine')+tuile(d.nouveaux7,'nouveaux sur 7 jours')+tuile(d.connectes1,'connectés aujourd’hui')+tuile(d.connectes7,'connectés sur 7 jours')+tuile(d.connectes30,'connectés sur 30 jours')+tuile(d.prives,'carnets privés')+'</div></section>'+
+    '<section class="card-box"><h3>Visites</h3><div class="tiles">'+tuile(som('visite',1)+som('anonyme',1),'visites aujourd’hui')+tuile(som('visite',7)+som('anonyme',7),'visites sur 7 jours')+tuile(som('anonyme',30),'visites sans compte sur 30 jours')+tuile(som('carnet',30),'carnets ouverts par d’autres sur 30 jours')+tuile(som('forum',30),'passages sur le forum sur 30 jours')+'</div>'+
+      '<div class="st-graph" role="img" aria-label="Visites des 30 derniers jours">'+barres+'</div><p class="muted petit"><span class="st-leg"></span>membres connectés <span class="st-leg anon"></span>sans compte. Une visite est comptée une fois par ouverture de Bobine.</p></section>'+
+    '<section class="card-box"><h3>Carnets les plus visités</h3>'+((d.top_carnets||[]).length?'<ol class="st-top">'+d.top_carnets.map(function(x){return '<li>'+lienPseudo(x.pseudo)+'<span>'+plural(+x.n,'visite','visites')+'</span></li>';}).join('')+'</ol>':'<p class="muted">Pas encore de visite de carnet.</p>')+'<p class="muted petit">Sur 30 jours, sans compter les propriétaires qui regardent leur propre carnet.</p></section>';
+}
+function enDirect(st){
+  var el=$('#st-live');if(!el)return;
+  var l=Object.keys(st||{}).map(function(k){var a=st[k]||[];return a[a.length-1]||{};});
+  var n=l.length,m=l.filter(function(x){return x.m;}).length,c=l.filter(function(x){return x.ou==='carnet';}).length,f=l.filter(function(x){return x.ou==='forum';}).length;
+  el.innerHTML='<div class="st-n"><b>'+fmtN(n)+'</b><span>'+(n>1?'personnes':'personne')+' en ce moment</span></div>'+
+    '<p class="sub">'+plural(m,'membre connecté','membres connectés')+', '+fmtN(n-m)+' sans compte'+(c?', '+fmtN(c)+' sur le carnet de quelqu’un':'')+(f?', '+fmtN(f)+' sur le forum':'')+'. Toi compris.</p>';
+}
+function brancherDirect(){
+  PRES.cb=enDirect;presRejoindre();
+  if(!sb||typeof sb.channel!=='function'){var el=$('#st-live');if(el)el.innerHTML='<p class="muted">Le compteur en direct n’est pas disponible ici.</p>';return;}
+  if(PRES.ch)try{enDirect(PRES.ch.presenceState());}catch(e){}
+}
 /* Une conversation réglée peut être effacée en entier, après confirmation */
 function regleAdmin(x){
   var rg=FZ.adm.regle||0,n=(x.messages||[]).length;
@@ -473,6 +531,8 @@ function regleAdmin(x){
 
 /* ---- Chargements après l'affichage d'une vue ---- */
 function apresRendu(r){
+  presMaj();
+  if(r==='forum')compterUneFois('bobine.forum','forum');
   if(r==='bilan'){garderTrophees();chargerFilmos();}
   if(r==='a-voir'&&!LECTURE){chargerPool();chargerTop();}
   if(r==='forum'){
@@ -487,6 +547,7 @@ function apresRendu(r){
   }
   if(r==='admin'&&FZ.notifs.admin){
     var u=routeParam();
+    if(u==='stats'){appel('bobine_admin_stats').then(function(d){remplirStats(d);brancherDirect();},function(e){var el=$('#fz-stats');if(el)el.innerHTML='<p class="muted">'+esc(erreurRpc(e))+'</p>';});return;}
     if(u){if(FZ.adm.pour!==u){FZ.adm.regle=0;FZ.adm.pour=u;}appel('bobine_admin_conversation',{p_user:u}).then(function(d){FZ.adm.une=d;remplirConvAdmin();chargerNotifs();});return;}
     Promise.all([appel('bobine_admin_conversations'),appel('bobine_admin_signalements'),appel('bobine_admin_signal_critiques').catch(function(){return [];})]).then(function(d){FZ.adm.conv=d[0]||[];FZ.adm.sign=d[1]||[];FZ.adm.crit=d[2]||[];if(route()==='admin'&&!routeParam())remplirAdmin();});
   }
@@ -735,39 +796,52 @@ function signalerCritique(n){
    Selon mes goûts : TMDB recommande des films à partir de ceux que tu as notés de 3,5 à 5 ou mis en coup de cœur.
    On enlève tout ce que tu as vu ou déjà mis dans À voir, puis on favorise tes genres préférés
    et les films qui ont une critique sur Bobine. */
-function poidsAime(f){return (f.r||3.5)+(f.l?1:0);}
+function poidsAime(f){return f?Math.max(.5,(f.r||3.5)-2.5)+(f.l?1:0):0;}
 function aimes(){return Object.values(S.films).filter(function(f){return f.w&&f.tm>0&&(f.r>=3.5||f.l);});}
+/* Les films de départ : une vingtaine pris parmi TOUS tes films notés de 3,5 à 5 (ou en coup de cœur).
+   Un 5 étoiles compte un peu plus qu'un 3,5, et ceux déjà utilisés aux visites précédentes passent après. */
 function graines(){
-  var a=aimes(),out=[];
-  while(a.length&&out.length<8){
-    var tot=a.reduce(function(s,f){return s+poidsAime(f)*poidsAime(f);},0),r=Math.random()*tot;
-    for(var i=0;i<a.length;i++){r-=poidsAime(a[i])*poidsAime(a[i]);if(r<=0)break;}
+  var deja={};try{(JSON.parse(localStorage.getItem('bobine.rl.graines')||'[]')||[]).forEach(function(tm){deja[tm]=1;});}catch(e){}
+  var a=aimes(),out=[],poids=function(f){return poidsAime(f)*(deja[f.tm]?.35:1);};
+  while(a.length&&out.length<24){
+    var tot=a.reduce(function(s,f){return s+poids(f);},0),r=Math.random()*tot,i=0;
+    for(;i<a.length;i++){r-=poids(a[i]);if(r<=0)break;}
     out.push(a.splice(Math.min(i,a.length-1),1)[0]);
   }
+  try{var garde=out.map(function(f){return f.tm;}).concat(Object.keys(deja).map(Number)).slice(0,80);localStorage.setItem('bobine.rl.graines',JSON.stringify(garde));}catch(e){}
   return out;
 }
 function chargerReco(){
   if(RL.recoCharge||!TMDB_FN)return;
   var g=graines();if(!g.length){RL.reco=[];return;}
   RL.recoCharge=true;RL.graines=g;
-  tmdbGet({reco:g.map(function(f){return f.tm;}).join(',')}).then(function(d){
-    RL.reco=d.reco||[];
+  var lots=[];for(var i=0;i<g.length;i+=8)lots.push(g.slice(i,i+8));
+  Promise.all(lots.map(function(l){return tmdbGet({reco:l.map(function(f){return f.tm;}).join(',')}).then(function(d){return d.reco||[];},function(){return [];});})).then(function(res){
+    var par={};
+    res.forEach(function(liste){liste.forEach(function(x){if(par[x.id]){par[x.id].de=par[x.id].de.concat(x.de||[]);}else par[x.id]=x;});});
+    RL.reco=Object.values(par);
     if(sb&&RL.reco.length)appel('bobine_avec_critiques',{p_tms:RL.reco.map(function(x){return x.id;}).slice(0,200)}).then(function(a){RL.avecCrit=a||[];if(route()==='a-voir')render();},function(){});
     if(route()==='a-voir')render();
-  },function(){RL.reco=[];RL.recoCharge=false;if(route()==='a-voir')render();});
+  });
 }
 function profilGenres(){var g={};aimes().forEach(function(f){(f.g||[]).forEach(function(id){g[id]=(g[id]||0)+poidsAime(f);});});return g;}
 function dejaPris(){var d={};Object.values(S.films).forEach(function(f){if(f.tm&&(f.w||f.wl))d[f.tm]=1;});return d;}
+/* La raison affichée : le vrai film d'origine, choisi une fois pour toutes pour ce film proposé */
+var RAISON={};
+function origine(id,liste){
+  if(!(id in RAISON)){var l=liste.filter(Boolean);RAISON[id]=l.length?l[Math.floor(Math.random()*l.length)]:null;}
+  return RAISON[id];
+}
 function candidatsGouts(){
   if(!RL.reco)return null;
   var deja=dejaPris(),pg=profilGenres(),tot=Object.values(pg).reduce(function(s,v){return s+v;},0)||1,gr={},crit={};
   (RL.graines||[]).forEach(function(f){gr[f.tm]=f;});(RL.avecCrit||[]).forEach(function(id){crit[id]=1;});
   return RL.reco.filter(function(x){return !deja[x.id]&&(x.vc||0)>=20;}).map(function(x){
-    var s=(x.de||[]).length*2+(x.g||[]).reduce(function(a,id){return a+(pg[id]||0);},0)/tot*4+Math.max(0,(x.va||0)-6)+(crit[x.id]?1.5:0);
-    var src=(x.de||[]).map(function(id){return gr[id];}).filter(Boolean).sort(function(a,b){return poidsAime(b)-poidsAime(a);})[0];
+    var s=1+Math.min(3,(x.de||[]).length)+(x.g||[]).reduce(function(a,id){return a+(pg[id]||0);},0)/tot*3+Math.max(0,(x.va||0)-6.5)+(crit[x.id]?1.5:0);
+    var src=origine('tm:'+x.id,(x.de||[]).map(function(id){return gr[id];}));
     var f=Object.values(S.films).find(function(y){return y.tm===x.id;})||{k:'tm'+x.id,t:x.t,y:x.y,p:x.p,tm:x.id};
-    return {id:'tm:'+x.id,f:f,poids:s*s,why:src?'Parce que tu as aimé '+src.t:'Une découverte pour toi',tm:{tm:x.id,t:x.t,y:x.y,p:x.p}};
-  }).sort(function(a,b){return b.poids-a.poids;}).slice(0,30);
+    return {id:'tm:'+x.id,f:f,poids:s,src:src&&src.tm,why:src?'Parce que tu as aimé '+src.t:'Une découverte pour toi',tm:{tm:x.id,t:x.t,y:x.y,p:x.p}};
+  }).sort(function(a,b){return b.poids-a.poids;}).slice(0,120);
 }
 /* Le film proposé : sa fiche TMDB (réalisateur, durée) et ce qu'en dit Bobine, chargés une fois */
 var RLF={};
@@ -803,32 +877,43 @@ function chargerPool(){
 function candidatsPool(){
   if(!RL.pool)return [];
   var deja=dejaPris(),pg=profilGenres(),tot=Object.values(pg).reduce(function(s,v){return s+v;},0)||1,am=aimes(),parReal={};
-  am.forEach(function(f){if(f.dri&&(!parReal[f.dri]||poidsAime(f)>poidsAime(parReal[f.dri])))parReal[f.dri]=f;});
+  am.forEach(function(f){if(f.dri)(parReal[f.dri]=parReal[f.dri]||[]).push(f);});
   return RL.pool.filter(function(x){return !deja[x.tm];}).map(function(x){
-    var g=x.g||[],gout=g.reduce(function(a,id){return a+(pg[id]||0);},0)/tot,real=x.dri&&parReal[x.dri];
-    var s=1+gout*5+(real?3:0)+Math.max(0,(Number(x.moy)||3)-3)*1.5+(x.crit?1.5:0)+(x.cc?.5:0)+Math.log(1+(x.nb||1))*.5;
-    var why;
-    if(real)why='Parce que tu as aimé '+real.t+', aussi de '+x.dr;
+    var g=x.g||[],gout=g.reduce(function(a,id){return a+(pg[id]||0);},0)/tot,reals=x.dri&&parReal[x.dri];
+    var s=2+gout*3+(reals?2:0)+Math.max(0,(Number(x.moy)||3)-3)+(x.crit?1.5:0)+(x.cc?.5:0);
+    var why,src=null;
+    if(reals){src=origine('tm:'+x.tm,reals);why='Parce que tu as aimé '+src.t+', aussi de '+x.dr;}
     else{
-      var proche=null,best=0;am.forEach(function(f){var n=(f.g||[]).filter(function(id){return g.indexOf(id)>=0;}).length;if(n>best||n===best&&n&&poidsAime(f)>poidsAime(proche)){best=n;proche=f;}});
-      why=proche&&best?'Parce que tu as aimé '+proche.t:(x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Bien noté sur Bobine');
+      var proches=am.filter(function(f){return (f.g||[]).some(function(id){return g.indexOf(id)>=0;});});
+      src=origine('tm:'+x.tm,proches);
+      why=src?'Parce que tu as aimé '+src.t:(x.cc>=2?'Coup de cœur de '+x.cc+' carnets sur Bobine':'Bien noté sur Bobine');
     }
     var f=Object.values(S.films).find(function(y){return y.tm===x.tm;})||{k:'tm'+x.tm,t:x.t,y:x.y,p:x.p,dr:x.dr,m:x.m,tm:x.tm};
-    return {id:'tm:'+x.tm,f:f,poids:s*s,why:why,tm:x};
-  }).sort(function(a,b){return b.poids-a.poids;}).slice(0,30);
+    return {id:'tm:'+x.tm,f:f,poids:s,src:src&&src.tm,why:why,tm:x};
+  });
 }
+/* Bobine d'abord : les films notés par les membres pèsent plus lourd,
+   mais les recommandations TMDB sont toujours là pour avoir une vraie sélection. */
 function rlCandidats(){
   if(RL.pool===null)return null;
-  var c=candidatsPool();
-  if(c.length>=5||!TMDB_FN)return c;
+  var c=candidatsPool().map(function(x){x.poids*=2;return x;});
+  if(!TMDB_FN)return c;
   if(RL.reco===null){chargerReco();return c.length?c:null;}
   var vus={};c.forEach(function(x){vus[x.id]=1;});
-  return c.concat((candidatsGouts()||[]).filter(function(x){return !vus[x.id];}).map(function(x){x.poids=x.poids/4;return x;}));
+  return c.concat((candidatsGouts()||[]).filter(function(x){return !vus[x.id];}));
 }
+/* Relancer : jamais un film déjà proposé pendant la soirée, et pas deux fois d'affilée le même film d'origine */
+var DEJA_TIRES={};
 function tirer(c,sauf){
-  var pool=c.length>1?c.filter(function(x){return x.id!==sauf;}):c,tot=pool.reduce(function(s,x){return s+x.poids;},0),r=Math.random()*tot;
-  for(var i=0;i<pool.length;i++){r-=pool[i].poids;if(r<=0)return pool[i];}
-  return pool[pool.length-1];
+  var der=sauf&&c.find(function(x){return x.id===sauf;}),srcDer=der&&der.src;
+  var pool=c.filter(function(x){return x.id!==sauf&&!DEJA_TIRES[x.id];});
+  if(!pool.length){DEJA_TIRES={};pool=c.filter(function(x){return x.id!==sauf;});}
+  if(!pool.length)pool=c;
+  var autre=pool.filter(function(x){return !srcDer||x.src!==srcDer;});if(autre.length)pool=autre;
+  var tot=pool.reduce(function(s,x){return s+x.poids;},0),r=Math.random()*tot,choix=pool[pool.length-1];
+  for(var i=0;i<pool.length;i++){r-=pool[i].poids;if(r<=0){choix=pool[i];break;}}
+  DEJA_TIRES[choix.id]=1;
+  return choix;
 }
 function rlCourant(c){
   if(!c||!c.length)return null;
@@ -1106,7 +1191,7 @@ function buildAnnee(ys){
   drawBulbs(x,W,22);drawBulbs(x,W,H-22);
   x.textBaseline='alphabetic';x.textAlign='left';
   /* en-tête, sous la zone du profil Insta */
-  x.fillStyle=ink;x.font='900 64px '+disp;x.fillText('BOBINE',M,318);
+  enteteStory(x,M,ink,disp);
   x.textAlign='right';x.fillStyle=gold;x.font='600 26px '+mono;x.fillText(('Ton année '+ys).toUpperCase(),W-M,300);
   var ps=Store.profil&&Store.profil.pseudo;if(ps){x.fillStyle=grey;x.font='500 24px '+mono;x.fillText('carnet de '+ps,W-M,336);}
   x.textAlign='left';
@@ -1138,7 +1223,7 @@ function openShareAnnee(ys){
   showDialog($('#share'));
   var fonts=['900 86px "Big Shoulders Display"','800 60px "Big Shoulders Display"','600 28px "IBM Plex Mono"'];
   var ready=(document.fonts&&document.fonts.load)?Promise.all(fonts.map(function(s){return document.fonts.load(s).catch(function(){});})):Promise.resolve();
-  ready=Promise.all([ready].concat(stAnnee(ys).top.map(chargerAffiche)));
+  ready=Promise.all([ready,chargerLogo()].concat(stAnnee(ys).top.map(chargerAffiche)));
   timeout(ready,3500).catch(function(){}).then(renderShare);
 }
 
@@ -1385,6 +1470,7 @@ confidentialite:function(){
   '<section class="card-box"><h3>Qui s’en occupe</h3><p>Bobine est un projet perso de Kawaze, sans entreprise derrière et sans revenus. Pour toute question sur tes données, utilise Écrire à l’équipe, depuis le Forum.</p></section>'+
   '<section class="card-box"><h3>Ce que Bobine garde</h3><p>Ton pseudo et ton image de profil Twitch, et un identifiant technique de compte. Rien d’autre sur toi, ni mail, ni âge, ni vrai nom.</p><p>Ton carnet, c’est à dire les films, notes, critiques, tags, listes, films à voir, et la date de visionnage quand tu choisis de l’ajouter.</p><p>Si tu règles une carte illimitée, son prix et les séances vues avec. Ces deux infos ne sont visibles que par toi, jamais sur ton carnet public.</p><p>Tes messages sur le forum, publics et signés de ton pseudo, et ta conversation avec l’équipe, que seuls toi et l’équipe lisez. Il n’y a pas de messages privés entre membres.</p><p>Jamais de lieu, d’adresse ou de position.</p></section>'+
   '<section class="card-box"><h3>Qui voit ton carnet</h3><p>Bobine est fait pour partager ton carnet de cinéphile. Il est visible par les autres membres, depuis ton pseudo dans le forum, sous tes critiques dans la fiche d’un film et dans la roulette, et par toute personne à qui tu donnes son lien.</p><p>Ta carte illimitée et ses séances restent visibles par toi seul.</p><p>Les carnets ne sont pas référencés sur Google.</p><p>Tu préfères rester dans ton coin ? Passe ton carnet en privé depuis ton compte. Il disparaît alors de partout, des moyennes, des critiques, de la roulette et du forum, et plus personne d’autre que toi ne peut le lire.</p><p>Une critique qui pose problème peut être signalée, et l’équipe peut la masquer.</p></section>'+
+  '<section class="card-box"><h3>Fréquentation</h3><p>Bobine compte ses visites pour savoir s’il est utilisé, sans traceur, sans cookie de mesure et sans garder d’adresse IP. On compte des visites, pas des personnes. Pour les membres connectés, seules la date de première et de dernière visite sont gardées. Ces compteurs sont effacés au bout de 13 mois et seul l’admin les voit.</p><p>L’admin voit aussi combien de personnes sont sur Bobine en ce moment, sans savoir qui. Ce compteur n’est enregistré nulle part.</p></section>'+
   '<section class="card-box"><h3>Où sont tes données</h3><p>Ton carnet est enregistré chez Supabase, l’hébergeur de la base, sur des serveurs en Irlande, dans l’Union européenne. La page elle-même est servie par GitHub Pages. Quand tu cherches un film, le titre tapé est envoyé à TMDB pour trouver l’affiche, sans rien sur toi.</p><p>Ton navigateur garde ta connexion et une copie de ton carnet pour aller plus vite. Pas de pub, pas de cookie de suivi, pas de revente de données.</p></section>'+
   '<section class="card-box"><h3>Tes droits</h3><p>Exporter tout ton carnet en CSV ou JSON, depuis Déménager. Le passer en privé, ou le supprimer entièrement depuis ton compte, ce qui efface aussi tes messages du forum et ta conversation avec l’équipe. Pour effacer aussi ton compte Twitch relié, écris à l’équipe.</p><p>Tes données restent tant que ton carnet existe, et partent dès que tu le supprimes.</p><p>Si tu as moins de 15 ans, demande l’accord d’un parent avant de créer ton carnet.</p></section>'+
   '</article>';
@@ -1479,7 +1565,7 @@ function buildCard(e){
   drawBulbs(x,W,22);drawBulbs(x,W,H-22);
   x.textBaseline='alphabetic';
   /* en-tête, sous la zone du profil */
-  x.fillStyle=ink;x.font='900 64px '+disp;x.textAlign='left';x.fillText('BOBINE',M,318);
+  x.textAlign='left';enteteStory(x,M,ink,disp);
   x.font='500 24px '+mono;x.fillStyle=grey;x.textAlign='right';x.fillText((e.rv&&!e.sp?'CRITIQUE':'SÉANCE')+(e.d?'  '+fmtDate(e.d).toUpperCase():''),W-M,312);
   /* affiche */
   var pw=420,ph=630,py=350;drawPoster(x,f,(W-pw)/2,py,pw,ph);
@@ -1536,12 +1622,24 @@ function renderShare(){
   $('#sh-img').src=cv.toDataURL('image/png');
   shareCtx.blob=null;cv.toBlob(function(b){shareCtx.blob=b;},'image/png');
 }
+/* Le logo de Bobine sur les images de story, chargé une fois */
+var LOGO=null;
+function chargerLogo(){
+  if(LOGO)return LOGO.pret;
+  LOGO=new Image();LOGO.pret=new Promise(function(ok){LOGO.onload=function(){ok();};LOGO.onerror=function(){LOGO.rate=true;ok();};});
+  LOGO.src='images/bobine-logo-detoure.png';return LOGO.pret;
+}
+function enteteStory(x,M,ink,disp){
+  var dx=M;
+  if(LOGO&&LOGO.complete&&!LOGO.rate&&LOGO.naturalWidth){var h=74,w=h*LOGO.naturalWidth/LOGO.naturalHeight;x.drawImage(LOGO,M,256,w,h);dx=M+w+18;}
+  x.fillStyle=ink;x.font='900 64px '+disp;x.fillText('BOBINE',dx,318);
+}
 function openShare(id){
   shareCtx.id=id;shareCtx.annee=null;$('#sh-title').textContent='Partager en story';$('#sh-msg').textContent='Sur téléphone, l’image s’ouvre dans le menu de partage. Choisis Instagram, puis Story.';
   closeDialog($('#log'));closeDialog($('#sheet'));showDialog($('#share'));
   var fonts=['900 86px "Big Shoulders Display"','800 60px "Big Shoulders Display"','500 40px "Instrument Sans"','500 28px "IBM Plex Mono"'];
   var ready=(document.fonts&&document.fonts.load)?Promise.all(fonts.map(function(s){return document.fonts.load(s).catch(function(){});})):Promise.resolve();
-  var se=S.diary.find(function(x){return x.id===id;});ready=Promise.all([ready,chargerAffiche(se&&film(se.k))]);
+  var se=S.diary.find(function(x){return x.id===id;});ready=Promise.all([ready,chargerAffiche(se&&film(se.k)),chargerLogo()]);
   timeout(ready,2500).catch(function(){}).then(renderShare);
 }
 function slug(s){return norm(s).replace(/\s+/g,'-').slice(0,40)||'film';}
@@ -1897,6 +1995,7 @@ $('#version').textContent='v'+VERSION;
 if(LECTURE){
   document.body.classList.add('lecture');$('#sync').style.display='none';
   render();renderCompte();chargerLecture();
+  setTimeout(function(){compterUneFois('bobine.vis','visite');compterUneFois('bobine.carnet.'+LECTURE.toLowerCase(),'carnet',LECTURE);presRejoindre();},1500);
 }else{
   var cached=lsGet(LS);if(cached)S=upgrade(cached);
   render();renderCompte();brancherSug();
